@@ -99,7 +99,7 @@ for chem_num in range(num_chems):
 num_msgs = len(np.unique(labels[c]))
 acc = np.zeros(num_msgs)
 accuracy_matrix = np.zeros((num_feats,num_msgs))
-plot_feat_num = 2
+plot_feat_num = 2 # increase this to plot more graphs
 for f in range(num_feats):
     
     if f<plot_feat_num:   
@@ -139,18 +139,15 @@ for f in range(num_feats):
     plt.show()
         
     accuracy_matrix[f,:] = acc
-    
-plt.stem(np.mean(accuracy_matrix,1))
-plt.show()
-plt.stem(np.mean(accuracy_matrix,0))
-plt.show()  
-
-plt.semilogy(1 - np.mean(accuracy_matrix[:,:],1),'.');plt.ylim((.0001,.3))
+     
+num_sf = int(num_feats/num_vars)
+plt.semilogy(1 - np.mean(accuracy_matrix[:,:],1),'.')
 for i in range(7):
-    plt.plot((i*219,i*219),(.0001,.3),'k')
+    plt.plot((i*num_sf,i*num_sf),(.0001,.3),'k')
 plt.xlabel('Feature index, V = 1...219,P=220,...')
 plt.ylabel('Error rate on chemical identification')
 plt.xlim((0,num_feats))
+plt.ylim((.001,.3))
 plt.title('Single feature error identification rates averaged over all patterns')
 plt.show() 
 
@@ -168,7 +165,19 @@ plt.ylabel('# Features classifying with accuracy>X')
 plt.xlabel('Accuracy')
 plt.show() 
 
-     
+thresh = 0.98
+inds_V = np.where(np.mean(accuracy_matrix[0:(1)*num_sf,:],1)>thresh )[0]
+inds_T = np.where(np.mean(accuracy_matrix[2*num_sf:3*num_sf,:],1)>thresh )[0]
+c_inds = np.intersect1d(inds_T,inds_V)
+
+plt.stem(1 - np.mean(accuracy_matrix[np.concatenate((c_inds,c_inds+num_sf*2),0),:],0))
+plt.xlabel('Pattern ID')
+plt.ylabel('Error')
+plt.title('Error rates by pattern')
+plt.show()
+
+# plt.plot(feat_mat_norm[0][c_inds,20:150],'k.');
+# plt.plot(feat_mat_norm[1][c_inds,20:150],'c.')
 #plt.scatter(range(len(vals_feat)),vals_feat,c=label_feat)
 #plt.plot(label_1nn)
 #classifier = KNeighborsClassifier(n_neighbors=1)  
