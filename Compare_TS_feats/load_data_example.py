@@ -5,101 +5,36 @@ Basic read in code for time series features
 -Eamonn
 
 """
+
+# Standard scientific package imports
 import os
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
-import scipy.io as sio
-import time
-import h5py
-import pandas as pd
-from sklearn import tree
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import accuracy_score
-from sklearn import linear_model
-from scipy.io import loadmat
-from scipy.ndimage.filters import maximum_filter1d,median_filter
-from scipy.ndimage.measurements import label
-from sklearn.model_selection import GridSearchCV
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.datasets import load_digits
-from sklearn.manifold import MDS
-from sklearn.neighbors import KNeighborsClassifier  
-import platform
 
-#a = platform.uname()
-#if a[1] == 'XPS15': # settings for graphs on 4K XPS15 only
-#    plt.style.use(['seaborn-paper']) # ,'dark_background'])
-#    matplotlib.rcParams['figure.figsize']   = (22, 22)
-#    matplotlib.rcParams['axes.titlesize']   = 30
-#    matplotlib.rcParams['axes.labelsize']   = 30
-#    matplotlib.rcParams['lines.linewidth']  = 2
-#    matplotlib.rcParams['lines.markersize'] = 20
-#    matplotlib.rcParams['xtick.labelsize']  = 30
-#    matplotlib.rcParams['ytick.labelsize']  = 30
+# Time series sub-functions and processes
+import TS_sub_functions
+from TS_sub_functions import *
 
+load_settings()
 #------------------------------------------------------------------------------
 #%%
 
 wdir = r"C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_feat_data"
 fname = r'chem_ts_feat'
+num_vars = 6 # number of test variables used
+normalize = 1
 
-# Load the data
-os.chdir(wdir)
-TSF_data = sio.loadmat(fname + '.mat')
-label_dict = TSF_data[fname]['labels'][0][0]
-feat_dict = TSF_data[fname]['feat_mat'][0,0]
-chem_names = TSF_data[fname]['chem_names'][0,0]
-num_chems = np.shape(chem_names)[0]
-num_feats = np.shape(feat_dict[0][chem_names[0][0][0]][0])[0]
+# Load the data and the basic data sizes, attributes
+# Also perform a normalization by feature, across all chemicals (blindly)
+chem_name,num_chems,num_feats,num_traces,num_msgs,labels,feat_mat_norm = (
+        load_TS_feat_matfile(wdir,fname,normalize))
 
-# Core information, pattern labels, features, chemicals for dictionaries
-labels = {}
-feat_mat = {}
-chem_name = {}
-
-# And some ancillary information
-num_traces = np.zeros(num_chems)
-feat_max_arr = np.zeros((num_feats,num_chems))
-feat_min_arr = np.zeros((num_feats,num_chems))
-
-# Get the labels and feature matrix for every chemical
-for chem_num in range(num_chems):
-
-    chem_name[chem_num] = chem_names[chem_num][0][0]
-    feat_mat[chem_num] = feat_dict[chem_name[chem_num]][0,0]
-    feat_mat[chem_num][np.isnan(feat_mat[chem_num])] = 0 # remove nan entries
-    labels[chem_num] = label_dict[chem_name[chem_num]][0][0]
-    num_traces[chem_num] = np.shape(feat_mat[chem_num])[1]
-    feat_max_arr[:,chem_num] = np.max(feat_mat[chem_num],1)
-    feat_min_arr[:,chem_num] = np.min(feat_mat[chem_num],1)
-    
-# Normalize data from 0 - 1 
-abs_max = np.nanmax(feat_max_arr,1) # max and min over all chemicals by feature
-abs_min = np.nanmin(feat_min_arr,1)
-range_feat = abs_max - abs_min + 10**-6
-feat_mat_norm = feat_mat
-for chem_num in range(num_chems):
-    
-    for f in range(num_feats):
-        all_trace_vals = feat_mat[chem_num][f,:]
-        all_trace_vals = (all_trace_vals - abs_min[f]) / range_feat[f]
-        feat_mat_norm[chem_num][f,:] = all_trace_vals    
-        
 #-----------------------------------------------------------------------------
 #%%
 
-#plt.loglog(np.median(Ace_mat,1),np.median(EtOH_mat,1),'.')
-#plt.loglog(np.mean(Ace_mat,1),np.mean(EtOH_mat,1),'.')
-#plt.loglog(np.max(Ace_mat,1),np.max(EtOH_mat,1),'.')
-#plt.loglog(np.min(Ace_mat,1),np.min(EtOH_mat,1),'.')
-#plt.xlim((10**-5,10**5));
-#plt.ylim((10**-2,10**1))
-
-num_msgs = len(np.unique(labels[c]))
 acc = np.zeros(num_msgs)
 accuracy_matrix = np.zeros((num_feats,num_msgs))
-plot_feat_num = 2 # increase this to plot more graphs
+plot_feat_num = 1 # increase this to plot more graphs
 for f in range(num_feats):
     
     if f<plot_feat_num:   
@@ -121,10 +56,11 @@ for f in range(num_feats):
         vals_feat = (np.concatenate((v1,v2),0))
         label_feat = np.concatenate((np.zeros(len(v1)),np.ones(len(v2))),0)
         if f<plot_feat_num: 
-            plt.subplot(6,4,trace_num+1)
+            x,y = get_best_subplot(num_msgs)
+            plt.subplot(y,x,trace_num+1)
             plt.scatter(range(len(vals_feat)),vals_feat,c=label_feat,vmin=-.5,vmax=1.5)
             plt.title(trace_num) 
-            plt.ylim((0,1))
+            # plt.ylim((0,1))
             plt.yticks([])
         
         # Iterate 1NN over all points and test against the true labels
@@ -139,7 +75,11 @@ for f in range(num_feats):
     plt.show()
         
     accuracy_matrix[f,:] = acc
-     
+
+# ----------------------------------------------------------------------------    
+#%%
+# Output various plots 
+    
 num_sf = int(num_feats/num_vars)
 plt.semilogy(1 - np.mean(accuracy_matrix[:,:],1),'.')
 for i in range(7):
@@ -151,7 +91,6 @@ plt.ylim((.001,.3))
 plt.title('Single feature error identification rates averaged over all patterns')
 plt.show() 
 
-num_vars = 6
 threshold = np.array([.9,.95,.98,.99,.995])
 feats_found = np.zeros((len(threshold),num_vars))
 tick = 0
