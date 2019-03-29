@@ -21,6 +21,7 @@ wdir = r"C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_
 fname = r'chem_ts_feat'
 normalize = 0 # Set to 1 to normalize all data by feature range to [0,1]
 plot_feat_num = 1 # increase this to plot more graphs, 0 for no _function_ plots
+thresh = 0.998 # Set required accuracy for a feature to be considered 'useful'
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -43,7 +44,6 @@ if plot_feat_num > 0:
 accuracy_matrix = gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num)
 
 # Find useful features above some threshold
-thresh = 0.998 # Determine an accuracy for a feature to be considered 'useful'
 c_inds = np.where(np.mean(accuracy_matrix,1)>thresh )[0]
 
 for i in range(len(c_inds)):
