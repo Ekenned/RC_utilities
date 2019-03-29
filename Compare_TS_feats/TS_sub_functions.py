@@ -23,7 +23,6 @@ from functools import reduce
 #from scipy.ndimage.measurements import label
 #from sklearn.model_selection import GridSearchCV
 #from sklearn.ensemble import RandomForestRegressor
-#from sklearn.datasets import load_digits
 #from sklearn.manifold import MDS
 #from sklearn.neighbors import KNeighborsClassifier  
 
@@ -77,6 +76,53 @@ def load_TS_feat_matfile(wdir,fname,normalize):
     
     return chem_name,num_chems,num_feats,num_traces,num_msgs,labels,feat_mat_norm
 
+# Iterate 1D 1NN over all points and test against the true labels
+def knn1d(num_obs,vals,labels):
+    label_1nn = np.zeros(num_obs)
+    for i in range(num_obs):
+        distances = np.abs(vals - vals[i])
+        distances[i] = np.max(distances) + 1 # rule out the value itself
+        label_1nn[i] = labels[np.where(distances==np.min(distances))[0][0]]
+        sing_acc = np.sum(1*(labels==label_1nn))/num_obs
+    return sing_acc         
+
+# Generate an accuracy for every feature and every pattern
+def gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
+
+    num_feats = np.shape(feat_mat_norm[0])[0] # just define these internally
+    num_msgs = len(np.unique(labels[0]))
+    acc = np.zeros(num_msgs)
+    accuracy_matrix = np.zeros((num_feats,num_msgs))
+    
+    for f in range(num_feats):
+        
+        if f == round(num_feats/2):
+            print('Halfway through features... (', f,'/',num_feats,')')
+        
+        for trace_num in range(num_msgs):
+            
+            # Seperate out features by chemical, plot a mxn grid for mxn traces
+            v1 = feat_mat_norm[0][f,np.where(labels[0]==trace_num+1)[0]]
+            v2 = feat_mat_norm[1][f,np.where(labels[1]==trace_num+1)[0]]
+            num_obs = len(v1)+len(v2)
+            vals_feat = (np.concatenate((v1,v2),0))
+            label_feat = np.concatenate((np.zeros(len(v1)),np.ones(len(v2))),0)
+            if f<plot_feat_num: 
+                x,y = get_best_subplot(num_msgs)
+                plt.subplot(y,x,trace_num+1)
+                plt.scatter(range(len(vals_feat)),vals_feat,c=label_feat,vmin=-.5,vmax=1.5)
+                plt.title(trace_num) 
+                # plt.ylim((0,1))
+                plt.yticks([])
+            
+            acc[trace_num] = knn1d(num_obs,vals_feat,label_feat)
+           
+        plt.show()
+            
+        accuracy_matrix[f,:] = acc
+    print('Feature x Pattern Accuracy matrix complete')
+    return accuracy_matrix
+
 def factors(n):    
     return set(reduce(list.__add__, 
                 ([i, n//i] for i in range(1, int(n**0.5) + 1) if n % i == 0))) 
@@ -103,13 +149,14 @@ def load_settings():
     if a[1] == 'XPS15': # settings for graphs on 4K XPS15 screen only
         print('Using 4k figure settings...')
         mpl.rcParams["font.family"] = "Arial"
-        mpl.rcParams['figure.figsize']   = (22, 22)
+        mpl.rcParams['figure.figsize']   = (20, 20)
         mpl.rcParams['axes.titlesize']   = 30
         mpl.rcParams['axes.labelsize']   = 30
         mpl.rcParams['lines.linewidth']  = 2
         mpl.rcParams['lines.markersize'] = 20
         mpl.rcParams['xtick.labelsize']  = 30
         mpl.rcParams['ytick.labelsize']  = 30
+        mpl.rcParams['axes.linewidth'] = 3
     else:
         mpl.rcParams["font.family"] = "Arial"
         mpl.rcParams['figure.figsize']   = (10, 10)
@@ -119,6 +166,7 @@ def load_settings():
         mpl.rcParams['lines.markersize'] = 8
         mpl.rcParams['xtick.labelsize']  = 16
         mpl.rcParams['ytick.labelsize']  = 16
+        mpl.rcParams['axes.linewidth'] = 3
         
     print('Modules and settings loaded')
         
