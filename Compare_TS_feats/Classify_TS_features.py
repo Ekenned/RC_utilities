@@ -19,7 +19,7 @@ from TS_sub_functions import *
 
 wdir = r"C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_feat_data"
 fname = r'chem_ts_feat'
-normalize = 0 # Set to 1 to normalize all data by feature range to [0,1]
+norm = 0 # Set to 1 to normalize all data by feature range to [0,1]
 plot_feat_num = 1 # increase this to plot more graphs, 0 for no _function_ plots
 thresh = 0.998 # Set required accuracy for a feature to be considered 'useful'
 
@@ -28,10 +28,13 @@ thresh = 0.998 # Set required accuracy for a feature to be considered 'useful'
 
 load_settings()
 
-# Load the data, normalize it, and load basic data attributes
-chem_name,num_chems,num_feats,num_traces,num_msgs,labels,feat_mat_norm = (
-        load_TS_feat_matfile(wdir,fname,normalize))
- 
+# Load the data
+num_feats,chem_names,feat_dict,label_dict = load_TS_feat_mfile(wdir,fname)
+
+# infer basic data attributes and optionally normalize data
+chem_name,num_chems,num_traces,num_msgs,labels,feat_mat_norm = (
+        get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm))
+
 # plot the first feature for all chemicals for all patterns
 if plot_feat_num > 0:
     for c in range(num_chems):        

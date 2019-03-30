@@ -26,7 +26,7 @@ from functools import reduce
 #from sklearn.manifold import MDS
 #from sklearn.neighbors import KNeighborsClassifier  
 
-def load_TS_feat_matfile(wdir,fname,normalize):
+def load_TS_feat_mfile(wdir,fname):
     
     # Load the data
     os.chdir(wdir)
@@ -37,12 +37,17 @@ def load_TS_feat_matfile(wdir,fname,normalize):
     num_chems = np.shape(chem_names)[0]
     num_feats = np.shape(feat_dict[0][chem_names[0][0][0]][0])[0]
     
+    return num_feats,chem_names,feat_dict,label_dict
+
+def get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm):
+    
     # Core information, pattern labels, features, chemicals for dictionaries
     labels = {}
     feat_mat = {}
     chem_name = {}
     
     # And some ancillary information for normalization
+    num_chems = np.shape(chem_names)[0]
     num_traces = np.zeros(num_chems)
     feat_max_arr = np.zeros((num_feats,num_chems))
     feat_min_arr = np.zeros((num_feats,num_chems))
@@ -59,13 +64,13 @@ def load_TS_feat_matfile(wdir,fname,normalize):
         feat_min_arr[:,chem_num] = np.min(feat_mat[chem_num],1)
         num_msgs = len(np.unique(labels[0]))    
     
-# Normalize data from 0 - 1 
+    # Normalize data from 0 - 1 
     abs_max = np.nanmax(feat_max_arr,1) # max and min over all chemicals by feature
     abs_min = np.nanmin(feat_min_arr,1)
     range_feat = abs_max - abs_min + 10**-6
     feat_mat_norm = feat_mat # instantiate the normalized vector
     
-    if normalize == 1:
+    if norm == 1:
         
         for chem_num in range(num_chems):
             
@@ -74,7 +79,7 @@ def load_TS_feat_matfile(wdir,fname,normalize):
                 all_trace_vals = (all_trace_vals - abs_min[f]) / range_feat[f]
                 feat_mat_norm[chem_num][f,:] = all_trace_vals 
     
-    return chem_name,num_chems,num_feats,num_traces,num_msgs,labels,feat_mat_norm
+    return chem_name,num_chems,num_traces,num_msgs,labels,feat_mat_norm
 
 # Iterate 1D 1NN over all points and test against the true labels
 def knn1d(num_obs,vals,labels):
@@ -122,6 +127,10 @@ def gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
         accuracy_matrix[f,:] = acc
     print('Feature x Pattern Accuracy matrix complete')
     return accuracy_matrix
+
+def append_pseudo_chem_data(num_pseudo_traces,feat_mat_norm,labels):
+    key_lim = len(feat_mat_norm.keys())
+    
 
 def factors(n):    
     return set(reduce(list.__add__, 
