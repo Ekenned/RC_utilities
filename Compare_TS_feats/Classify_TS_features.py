@@ -36,15 +36,29 @@ chem_name,num_chems,num_traces,num_msgs,labels,feat_mat_norm = (
         get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm))
 
 # plot the first feature for all chemicals for all patterns
-if plot_feat_num > 0:
-    for c in range(num_chems):        
-        plt.scatter(labels[c],feat_mat_norm[c][0,:])   
-    plt.xlabel('message ID')
-    plt.ylabel('Feature values')
-    plt.show()
+#if plot_feat_num > 0:
+#    for c in range(num_chems):        
+#        plt.scatter(labels[c],feat_mat_norm[c][0,:])   
+#    plt.xlabel('message ID')
+#    plt.ylabel('Feature values')
+#    plt.show()
+ 
+N = 3 # Create 5 pseudo accuracy matrices for bootstrapping  
+pseudo_acc_means = gen_pseudo_mat(
+        num_chems,N,num_msgs,num_traces,labels,feat_mat_norm) 
 
-# Generate an accuracy for every feature and every pattern, num_traces may vary
+# Generate true accuracy for every feature and every pattern, num_traces may vary
 accuracy_matrix = gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num)
+
+for k in range(N):
+    plt.loglog(pseudo_acc_means[k],'c.')
+plt.loglog(1 - np.sort(np.mean(accuracy_matrix,1))[::-1],'k.')
+plt.xlabel('Features sorted by most accurate first')
+plt.ylabel('Feature accuracy')
+plt.title('True vs. pseudo label feature accuracy comparison - black is true case')
+plt.xlim((1,1000))
+plt.ylim((.001, 1))
+plt.show()
 
 # Find useful features above some threshold
 c_inds = np.where(np.mean(accuracy_matrix,1)>thresh )[0]

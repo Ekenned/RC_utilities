@@ -91,7 +91,7 @@ def knn1d(num_obs,vals,labels):
         sing_acc = np.sum(1*(labels==label_1nn))/num_obs
     return sing_acc         
 
-# Generate an accuracy for every feature and every pattern
+# Generate an accuracy for every feature and pattern for 2 Chemicals
 def gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
 
     num_feats = np.shape(feat_mat_norm[0])[0] # just define these internally
@@ -127,6 +127,62 @@ def gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
         accuracy_matrix[f,:] = acc
     print('Feature x Pattern Accuracy matrix complete')
     return accuracy_matrix
+
+# Generate entire accuracy matrix for some pseudo labels N times, return means
+def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
+
+    pseudo_acc_means = {}
+    for k in range(N):
+        print('Developing pseudo-accuracies for label set #',k,'/',N-1)
+        
+        # Perform a pseudo random label bootstrap, first develop the random labels
+        pseudo_labels = {}
+        for i in range(num_chems):
+            pseudo_labels[i] = 1 + np.random.choice(int(num_msgs),int(num_traces[i]))
+        
+        # Applt the pseudo labels to develop an accuracy matrix, and mean vector
+        pseudo_acc_mat = gen_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0)
+        pseudo_acc_means[k] = 1 - np.sort(np.mean(pseudo_acc_mat,1))[::-1]
+        
+    return pseudo_acc_means
+
+# Generate an accuracy for every feature and every pattern
+def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
+
+    num_feats = np.shape(feat_mat_norm[0])[0] # just define these internally
+    num_msgs = len(np.unique(labels[0]))
+    acc = np.zeros(num_msgs)
+    accuracy_matrix = np.zeros((num_feats,num_msgs))
+    
+    for f in range(num_feats):
+        
+        if f == round(num_feats/2):
+            print('Halfway through features... (', f,'/',num_feats,')')
+        
+        for trace_num in range(num_msgs):
+            
+            # Seperate out features by chemical, plot a mxn grid for mxn traces
+            v1 = feat_mat_norm[0][f,np.where(labels[0]==trace_num+1)[0]]
+            v2 = feat_mat_norm[1][f,np.where(labels[1]==trace_num+1)[0]]
+            num_obs = len(v1)+len(v2)
+            vals_feat = (np.concatenate((v1,v2),0))
+            label_feat = np.concatenate((np.zeros(len(v1)),np.ones(len(v2))),0)
+            if f<plot_feat_num: 
+                x,y = get_best_subplot(num_msgs)
+                plt.subplot(y,x,trace_num+1)
+                plt.scatter(range(len(vals_feat)),vals_feat,c=label_feat,vmin=-.5,vmax=1.5)
+                plt.title(trace_num) 
+                # plt.ylim((0,1))
+                plt.yticks([])
+            
+            acc[trace_num] = knn1d(num_obs,vals_feat,label_feat)
+           
+        plt.show()
+            
+        accuracy_matrix[f,:] = acc
+    print('Feature x Pattern Accuracy matrix complete')
+    return mult_acc_matrix
+
 
 def append_pseudo_chem_data(num_pseudo_traces,feat_mat_norm,labels):
     key_lim = len(feat_mat_norm.keys())
