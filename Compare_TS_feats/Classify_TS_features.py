@@ -43,16 +43,18 @@ chem_name,num_chems,num_traces,num_msgs,labels,feat_mat_norm = (
 #    plt.ylabel('Feature values')
 #    plt.show()
  
-N = 3 # Create 5 pseudo accuracy matrices for bootstrapping  
+N = 1 # Create 5 pseudo accuracy matrices for bootstrapping  
 pseudo_acc_means = gen_pseudo_mat(
         num_chems,N,num_msgs,num_traces,labels,feat_mat_norm) 
 
 # Generate true accuracy for every feature and every pattern, num_traces may vary
 accuracy_matrix = gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num)
 
+num_below_1pc = np.zeros(N)
 for k in range(N):
     plt.loglog(pseudo_acc_means[k],'c.')
-plt.loglog(1 - np.sort(np.mean(accuracy_matrix,1))[::-1],'k.')
+    num_below_1pc[k] = len(np.where(pseudo_acc_means[k]<(1-.99))[0])
+plt.loglog(sort_mat_err(accuracy_matrix),'k.')
 plt.xlabel('Features sorted by most accurate first')
 plt.ylabel('Feature accuracy')
 plt.title('True vs. pseudo label feature accuracy comparison - black is true case')
@@ -105,13 +107,13 @@ for j in threshold:
     acc_feats[tick] = np.sum(np.mean(accuracy_matrix,1)>=j)
     tick = tick+1
 
-plt.loglog(1-threshold,acc_feats,'.')
-plt.ylabel('# Features classifying at < error')
-plt.xlabel('Identification error rate')
-plt.ylim((1,1000))
-plt.xlim((.001,1))
-plt.grid()
-plt.show() 
+#plt.loglog(1-threshold,acc_feats,'.')
+#plt.ylabel('# Features classifying at < error')
+#plt.xlabel('Identification error rate')
+#plt.ylim((1,1000))
+#plt.xlim((.001,1))
+#plt.grid()
+#plt.show() 
 
 # plt.plot(feat_mat_norm[0][c_inds,20:150],'k.');
 # plt.plot(feat_mat_norm[1][c_inds,20:150],'c.')

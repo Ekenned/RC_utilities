@@ -128,6 +128,11 @@ def gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
     print('Feature x Pattern Accuracy matrix complete')
     return accuracy_matrix
 
+# Plot sorted accuracy matrix mean errors
+def sort_mat_err(mat):
+    mean_errs = 1 - np.sort(np.mean(mat,1))[::-1]
+    return mean_errs
+
 # Generate entire accuracy matrix for some pseudo labels N times, return means
 def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
 
@@ -142,7 +147,7 @@ def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
         
         # Applt the pseudo labels to develop an accuracy matrix, and mean vector
         pseudo_acc_mat = gen_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0)
-        pseudo_acc_means[k] = 1 - np.sort(np.mean(pseudo_acc_mat,1))[::-1]
+        pseudo_acc_means[k] = sort_mat_err(pseudo_acc_mat)
         
     return pseudo_acc_means
 
