@@ -12,6 +12,7 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 import platform
 from functools import reduce
+from sklearn.manifold import MDS
 
 #import h5py
 #import pandas as pd
@@ -150,6 +151,30 @@ def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
         pseudo_acc_means[k] = sort_mat_err(pseudo_acc_mat)
         
     return pseudo_acc_means
+
+def MDS_plot(feat_mat_norm,labels,num_msgs,c_inds):
+
+    arr1 = feat_mat_norm[0][c_inds,:] # c_inds in first
+    arr2 = feat_mat_norm[1][c_inds,:]
+    concat_arr = np.concatenate((arr1,arr2),1)
+    concat_arr = np.transpose(concat_arr)
+    
+    embedding = MDS(n_components=2)
+    
+    arr_transformed = embedding.fit_transform(concat_arr)
+    
+    for k in range(num_msgs-1):
+        pat = k + 1
+        loc1 = np.where(labels[0]==pat)[0]
+        loc2 = len(labels[0]) + np.where(labels[1]==pat)[0]
+        plt.scatter(arr_transformed[loc1,0],arr_transformed[loc1,1],marker='s')
+        plt.scatter(arr_transformed[loc2,0],arr_transformed[loc2,1],marker='^')
+    
+#    plt.ylim((-2,2))
+#    plt.xlim((-2,2))
+    plt.title('2-component reduction of the feature dataset')
+    plt.show()
+
 
 # Generate an accuracy for every feature and every pattern
 def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
