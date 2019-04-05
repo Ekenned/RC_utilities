@@ -92,8 +92,54 @@ def knn1d(num_obs,vals,labels):
         sing_acc = np.sum(1*(labels==label_1nn))/num_obs
     return sing_acc         
 
-# Generate an accuracy for every feature and pattern for 2 Chemicals
-def gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
+# Generate an accuracy for every feature and pattern for N chemicals
+def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
+
+    num_feats = np.shape(feat_mat_norm[0])[0] # just define these internally
+    num_msgs = len(np.unique(labels[0]))
+    acc = np.zeros(num_msgs)
+    accuracy_matrix = np.zeros((num_feats,num_msgs))
+    num_chems = len(feat_mat_norm.keys())
+    print('operating')
+    
+    for f in range(num_feats):
+        
+        if f == round(num_feats/2):
+            print('Halfway through features... (', f,'/',num_feats,')')
+        
+        for trace_num in range(num_msgs):
+            
+            # Seperate out features by chemical
+            v = {}
+            num_obs = np.zeros(num_chems)
+            vals_feat = np.array([])
+            label_feat = np.array([])
+            for c in range(num_chems):
+                v[c] = feat_mat_norm[c][f,np.where(labels[c]==trace_num+1)[0]]
+                num_obs[c] = len(v[c])
+                vals_feat = np.append(vals_feat,v[c])
+                label_feat = np.append(label_feat,c*(np.ones(int(num_obs[c]))))
+            net_obs = sum(num_obs)
+
+            if f<plot_feat_num: 
+                x,y = get_best_subplot(num_msgs)
+                plt.subplot(y,x,trace_num+1)
+                # plt.scatter(label_feat,vals_feat,c=label_feat)
+                plt.scatter(range(len(vals_feat)),vals_feat,c=label_feat,vmin=-.5,vmax=1.5)
+                plt.title(trace_num) 
+                # plt.ylim((0,1))
+                plt.yticks([])
+            
+            acc[trace_num] = knn1d(int(net_obs),vals_feat,label_feat)
+           
+        plt.show()
+            
+        accuracy_matrix[f,:] = acc
+    print('Feature x Pattern Accuracy matrix complete')
+    return accuracy_matrix
+
+# Generate an accuracy for every feature and pattern for only 2 chemicals
+def two_chem_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
 
     num_feats = np.shape(feat_mat_norm[0])[0] # just define these internally
     num_msgs = len(np.unique(labels[0]))
@@ -135,6 +181,24 @@ def sort_mat_err(mat):
     return mean_errs
 
 # Generate entire accuracy matrix for some pseudo labels N times, return means
+def twochem_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
+
+    pseudo_acc_means = {}
+    for k in range(N):
+        print('Developing pseudo-accuracies for label set #',k,'/',N-1)
+        
+        # Perform a pseudo random label bootstrap, first develop the random labels
+        pseudo_labels = {}
+        for i in range(num_chems):
+            pseudo_labels[i] = 1 + np.random.choice(int(num_msgs),int(num_traces[i]))
+        
+        # Applt the pseudo labels to develop an accuracy matrix, and mean vector
+        pseudo_acc_mat = two_chem_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0)
+        pseudo_acc_means[k] = sort_mat_err(pseudo_acc_mat)
+        
+    return pseudo_acc_means
+
+# Generate entire accuracy matrix for some pseudo labels N times, return means
 def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
 
     pseudo_acc_means = {}
@@ -147,75 +211,56 @@ def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
             pseudo_labels[i] = 1 + np.random.choice(int(num_msgs),int(num_traces[i]))
         
         # Applt the pseudo labels to develop an accuracy matrix, and mean vector
-        pseudo_acc_mat = gen_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0)
+        pseudo_acc_mat = mult_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0)
         pseudo_acc_means[k] = sort_mat_err(pseudo_acc_mat)
         
     return pseudo_acc_means
 
+# Get reduced multidimensional representation of the data
 def MDS_plot(feat_mat_norm,labels,num_msgs,c_inds):
-
-    arr1 = feat_mat_norm[0][c_inds,:] # c_inds in first
-    arr2 = feat_mat_norm[1][c_inds,:]
-    concat_arr = np.concatenate((arr1,arr2),1)
+    
+    num_chems = len(feat_mat_norm.keys())
+    feat_arr = {}
+    concat_arr = np.array([])
+    label_feat = np.array([])
+    
+    for c in range(num_chems):
+        feat_arr[c] = feat_mat_norm[c][c_inds,:] # c_inds in first
+        label_list = c*(np.ones(np.shape(feat_arr[c])[1]))
+        label_feat = np.append(label_feat,label_list)
+        if c == 0:
+            concat_arr = feat_arr[c]
+        else:
+            concat_arr = np.concatenate((concat_arr,feat_arr[c]),1)
+                
     concat_arr = np.transpose(concat_arr)
     
     embedding = MDS(n_components=2)
     
-    arr_transformed = embedding.fit_transform(concat_arr)
+    arr_trans = embedding.fit_transform(concat_arr)
     
-    for k in range(num_msgs-1):
-        pat = k + 1
-        loc1 = np.where(labels[0]==pat)[0]
-        loc2 = len(labels[0]) + np.where(labels[1]==pat)[0]
-        plt.scatter(arr_transformed[loc1,0],arr_transformed[loc1,1],marker='s')
-        plt.scatter(arr_transformed[loc2,0],arr_transformed[loc2,1],marker='^')
+    marker_list =	{0: ".",1: "o",2: "^",3: "s",4: "x"}
+    for c in range(num_chems):
+        inds = np.where(label_feat==c)[0]
+        plt.scatter(arr_trans[inds,0],arr_trans[inds,1],marker=marker_list[c])
+    plt.title('2-component reduction of discriminating feature')
+    plt.show()
+    
+    return arr_trans,label_feat
+        
+#    for k in range(num_msgs-1):
+#        pat = k + 1
+#        loc = {}
+#        for c in range(num_chems):
+#            loc[c] = np.where(labels[c]==pat)[0]
+#            loc2[c] = len(labels[c]) + np.where(labels[c]==pat)[0]
+#        plt.scatter(arr_transformed[loc1,c],arr_transformed[loc1,1],marker='s')
     
 #    plt.ylim((-2,2))
-#    plt.xlim((-2,2))
-    plt.title('2-component reduction of the feature dataset')
-    plt.show()
+#    plt.xlim((-2,2)))
 
-
-# Generate an accuracy for every feature and every pattern
-def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
-
-    num_feats = np.shape(feat_mat_norm[0])[0] # just define these internally
-    num_msgs = len(np.unique(labels[0]))
-    acc = np.zeros(num_msgs)
-    accuracy_matrix = np.zeros((num_feats,num_msgs))
-    
-    for f in range(num_feats):
-        
-        if f == round(num_feats/2):
-            print('Halfway through features... (', f,'/',num_feats,')')
-        
-        for trace_num in range(num_msgs):
-            
-            # Seperate out features by chemical, plot a mxn grid for mxn traces
-            v1 = feat_mat_norm[0][f,np.where(labels[0]==trace_num+1)[0]]
-            v2 = feat_mat_norm[1][f,np.where(labels[1]==trace_num+1)[0]]
-            num_obs = len(v1)+len(v2)
-            vals_feat = (np.concatenate((v1,v2),0))
-            label_feat = np.concatenate((np.zeros(len(v1)),np.ones(len(v2))),0)
-            if f<plot_feat_num: 
-                x,y = get_best_subplot(num_msgs)
-                plt.subplot(y,x,trace_num+1)
-                plt.scatter(range(len(vals_feat)),vals_feat,c=label_feat,vmin=-.5,vmax=1.5)
-                plt.title(trace_num) 
-                # plt.ylim((0,1))
-                plt.yticks([])
-            
-            acc[trace_num] = knn1d(num_obs,vals_feat,label_feat)
-           
-        plt.show()
-            
-        accuracy_matrix[f,:] = acc
-    print('Feature x Pattern Accuracy matrix complete')
-    return mult_acc_matrix
-
-
-def append_pseudo_chem_data(num_pseudo_traces,feat_mat_norm,labels):
-    key_lim = len(feat_mat_norm.keys())
+#def append_pseudo_chem_data(num_pseudo_traces,feat_mat_norm,labels):
+#    key_lim = len(feat_mat_norm.keys())
     
 
 def factors(n):    

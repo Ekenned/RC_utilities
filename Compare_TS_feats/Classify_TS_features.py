@@ -36,13 +36,13 @@ chem_name,num_chems,num_traces,num_msgs,labels,feat_mat_norm = (
         get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm))
 
 # Generate true accuracy for every feature and every pattern, num_traces may vary
-accuracy_matrix = gen_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num)
+accuracy_matrix = mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num)
 
 # Find useful features above some threshold
 c_inds = np.where(np.mean(accuracy_matrix,1)>thresh )[0]
 
 # Plot a reduced dimensional representation of the feature data
-MDS_plot(feat_mat_norm,labels,num_msgs,c_inds)
+arr_trans,label_feat = MDS_plot(feat_mat_norm,labels,num_msgs,c_inds)
 
 #%%
 
@@ -84,14 +84,17 @@ plt.ylabel('Error')
 plt.title('Average error rates by pattern, using features above threshold')
 plt.show()
  
-chem1 = feat_mat_norm[1][c_inds[-1],:]
-chem2 = feat_mat_norm[0][c_inds[-1],:]
-plt.plot(labels[1],chem1,'.')
-plt.plot(labels[0],chem2,'.')
-plt.xlabel('Pattern ID')
-plt.ylabel('Feature value')
-plt.title('Plot of the final discriminating feature values by chemical-color')
-plt.show()
+for feat_ind in range(len(c_inds)):
+    
+    chem = {}
+    for c in range(num_chems):
+        chem[c] = feat_mat_norm[c][c_inds[feat_ind],:]    
+        plt.plot(labels[c],chem[c],'.')
+    
+    plt.xlabel('Pattern ID')
+    plt.ylabel('Feature value')
+    plt.title('Plot of the final discriminating feature values by chemical-color')
+    plt.show()
     
 
 plt.semilogy(c_inds,1 - np.mean(accuracy_matrix[c_inds,:],1),'o')
