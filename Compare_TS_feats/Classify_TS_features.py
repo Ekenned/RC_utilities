@@ -17,11 +17,12 @@ from TS_sub_functions import *
 # ----------------------------------------------------------------------------
 # User inputs:
 
-wdir = r"C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_feat_data"
-fname = r'chem_ts_feat'
-norm = 0 # Set to 1 to normalize all data by feature range to [0,1]
-plot_feat_num = 1 # increase this to plot more graphs, 0 for no _function_ plots
-thresh = 0.99 # Set required accuracy for a feature to be considered 'useful'
+wdir    = r"C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_feat_data"
+fname   = r'chem_ts_feat'
+norm    = 0 # Set to 1 to normalize all data by feature range to [0,1]
+pl_num  = 1 # increase this to plot more graphs, or 0 for no func plots
+thresh  = 0.99 # Set required accuracy for a feature to be considered 'useful'
+N       = 2 # Create pseudo accuracy matrices for bootstrapping
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -36,32 +37,38 @@ chem_name,num_chems,num_traces,num_msgs,labels,feat_mat_norm = (
         get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm))
 
 # Generate true accuracy for every feature and every pattern, num_traces may vary
-accuracy_matrix = mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num)
+accuracy_matrix = mult_acc_matrix(num_traces,labels,feat_mat_norm,pl_num)
 
 # Find useful features above some threshold
 c_inds = np.where(np.mean(accuracy_matrix,1)>thresh )[0]
 
+# Concatenate a subset array of useful features
+label_feat,concat_arr = concat_sub_feats(feat_mat_norm,labels,c_inds)
+
 # Plot a reduced dimensional representation of the feature data
-arr_trans,label_feat = MDS_plot(feat_mat_norm,labels,num_msgs,c_inds)
+# MDS_plot(feat_mat_norm,labels,c_inds)
+
+# Get multifeature knn
+num_reps = 100 ; train_samp = 400 ; n = 1 ; # knn settings
+acc_tests = rep_knn_mult(num_reps,train_samp,concat_arr,label_feat,n)
 
 #%%
 
 # plot the first feature for all chemicals for all patterns
-#if plot_feat_num > 0:
+#if pl_num > 0:
 #    for c in range(num_chems):        
 #        plt.scatter(labels[c],feat_mat_norm[c][0,:])   
 #    plt.xlabel('message ID')
 #    plt.ylabel('Feature values')
 #    plt.show()
- 
-N = 3 # Create pseudo accuracy matrices for bootstrapping  
+   
 pseudo_acc_means = gen_pseudo_mat(
         num_chems,N,num_msgs,num_traces,labels,feat_mat_norm) 
 
-num_below_1pc = np.zeros(N)
+num_below_pc = np.zeros(N)
 for k in range(N):
     plt.loglog(pseudo_acc_means[k],'c.')
-    num_below_1pc[k] = len(np.where(pseudo_acc_means[k]<(1-.99))[0])
+    num_below_pc[k] = len(np.where(pseudo_acc_means[k]<(1-thresh))[0])
 plt.loglog(sort_mat_err(accuracy_matrix),'k.')
 plt.xlabel('Features sorted by most accurate first')
 plt.ylabel('Classification error')
@@ -84,7 +91,7 @@ plt.ylabel('Error')
 plt.title('Average error rates by pattern, using features above threshold')
 plt.show()
  
-for feat_ind in range(len(c_inds)):
+for feat_ind in range(1):# range(len(c_inds)):
     
     chem = {}
     for c in range(num_chems):
@@ -130,8 +137,12 @@ for j in threshold:
 # plt.plot(feat_mat_norm[1][c_inds,20:150],'c.')
 #plt.scatter(range(len(vals_feat)),vals_feat,c=label_feat)
 #plt.plot(label_1nn)
-#classifier = KNeighborsClassifier(n_neighbors=1)  
-#classifier.fit(vals_feat_subset, label_feat_subset) 
+from mpl_toolkits.mplot3d import axes3d
+fig = plt.figure()
+ax = fig.add_subplot(1, 1, 1, axisbg="0.5")
+ax = fig.gca(projection='3d')
+ax.scatter(concat_arr[:,0],concat_arr[:,1],concat_arr[:,2],c=label_feat,s=100,cmap='Spectral')
+plt.show()
 
 
 
