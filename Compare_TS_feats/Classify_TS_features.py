@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 
-Basic read in code for time series features
+Read and classify code for time series trufflebot features
 -Eamonn
 
 """
@@ -9,7 +9,6 @@ Basic read in code for time series features
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-# from sklearn.neighbors import KNeighborsClassifier
 import TS_sub_functions # Custom time series sub-functions and processes
 from TS_sub_functions import *
  
@@ -112,7 +111,7 @@ for i in range(8*3):
 plt.xlabel('Feature index, V = 1...219,P=220,...')
 plt.ylabel('Error rate on chemical identification')
 plt.xlim((0,num_feats))
-plt.ylim((.001,.3))
+plt.ylim((.0001,.3))
 plt.title('Single feature error identification rates averaged over all patterns')
 plt.savefig('destination_path.eps', format='eps', dpi=300)
 plt.show() 
