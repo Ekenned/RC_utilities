@@ -58,6 +58,7 @@ def get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm):
         chem_name[chem_num] = chem_names[chem_num][0][0]
         feat_mat[chem_num] = feat_dict[chem_name[chem_num]][0,0]
         feat_mat[chem_num][np.isnan(feat_mat[chem_num])] = 0 # remove nan entries
+        feat_mat[chem_num][~np.isfinite(feat_mat[chem_num])] = 0 # remove infinite entries
         labels[chem_num] = label_dict[chem_name[chem_num]][0][0]
         num_traces[chem_num] = np.shape(feat_mat[chem_num])[1]
         feat_max_arr[:,chem_num] = np.max(feat_mat[chem_num],1)
@@ -92,16 +93,19 @@ def knn1d(num_obs,vals,labels):
     return sing_acc         
 
 # Generate an accuracy for every feature and pattern for N chemicals
-def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
+def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num,lim_feat):
 
     num_feats = np.shape(feat_mat_norm[0])[0] # just define these internally
+    if lim_feat == 1: # optionally limit to 5000 features for time, etc
+        if num_feats>5000:
+            num_feats=5000
     num_msgs = len(np.unique(labels[0]))
     acc = np.zeros(num_msgs)
     accuracy_matrix = np.zeros((num_feats,num_msgs))
     num_chems = len(feat_mat_norm.keys())
     
     for f in range(num_feats):
-        
+
         if f == round(num_feats/2):
             print('Halfway through features... (', f,'/',num_feats,')')
         
@@ -129,6 +133,9 @@ def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num):
                 plt.yticks([])
             
             acc[trace_num] = knn1d(int(net_obs),vals_feat,label_feat)
+        
+        if np.remainder(f,100)==0:    
+            print(f,np.median(acc))
            
         plt.show()
             
@@ -142,7 +149,8 @@ def sort_mat_err(mat):
     return mean_errs
 
 # Generate entire accuracy matrix for some pseudo labels N times, return means
-def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
+def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm,lim_feat):
+
 
     pseudo_acc_means = {}
     for k in range(N):
@@ -154,7 +162,7 @@ def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
             pseudo_labels[i] = 1 + np.random.choice(int(num_msgs),int(num_traces[i]))
         
         # Applt the pseudo labels to develop an accuracy matrix, and mean vector
-        pseudo_acc_mat = mult_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0)
+        pseudo_acc_mat = mult_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0,lim_feat)
         pseudo_acc_means[k] = sort_mat_err(pseudo_acc_mat)
         
     return pseudo_acc_means
@@ -217,7 +225,7 @@ def rep_knn_mult(num_reps,train_samp,concat_arr,label_feat,n):
     acc_tests = np.zeros(num_reps)
     for i in range(num_reps):
         acc_tests[i] = knn_mult(train_samp,concat_arr,label_feat,n)
-    print('Classification error (', train_samp,'/',len(label_feat), ' test traces): ',1 - np.median(acc_tests))
+    print('Classification error: ',1 - np.median(acc_tests))
     print(' \n ')
     return acc_tests
 

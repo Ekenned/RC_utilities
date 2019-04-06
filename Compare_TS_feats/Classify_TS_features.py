@@ -17,11 +17,12 @@ from TS_sub_functions import *
 # User inputs:
 
 wdir    = r"C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_feat_data"
-fname   = r'chem_ts_feat'
+fname   = r'chem_ts_feat_long'
 norm    = 0 # Set to 1 to normalize all data by feature range to [0,1]
-pl_num  = 1 # increase this to plot more graphs, or 0 for no func plots
-thresh  = 0.99 # Set required accuracy for a feature to be considered 'useful'
-N       = 2 # Create pseudo accuracy matrices for bootstrapping
+pl_num  = 0 # increase this to plot more graphs, or 0 for no func plots
+thresh  = 0.9999 # Set required accuracy for a feature to be considered 'useful'
+N       = 1 # Create pseudo accuracy matrices for bootstrapping
+lim_feat= 0 # Sets a limit of 5000 features if activated
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -36,7 +37,7 @@ chem_name,num_chems,num_traces,num_msgs,labels,feat_mat_norm = (
         get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm))
 
 # Generate true accuracy for every feature and every pattern, num_traces may vary
-accuracy_matrix = mult_acc_matrix(num_traces,labels,feat_mat_norm,pl_num)
+accuracy_matrix = mult_acc_matrix(num_traces,labels,feat_mat_norm,pl_num,lim_feat)
 
 # Find useful features above some threshold
 c_inds = np.where(np.mean(accuracy_matrix,1)>thresh )[0]
@@ -48,8 +49,8 @@ label_feat,concat_arr = concat_sub_feats(feat_mat_norm,labels,c_inds)
 # MDS_plot(feat_mat_norm,labels,c_inds)
 
 # Get multifeature knn
-num_reps = 100 ; train_samp = 400 ; n = 1 ; # knn settings
-acc_tests = rep_knn_mult(num_reps,train_samp,concat_arr,label_feat,n)
+num_reps = 100 ; train_samp = 20 ; n = 1 ; first_feats = 20; # knn settings
+acc_tests = rep_knn_mult(num_reps,train_samp,concat_arr[:,0:first_feats],label_feat,n)
 
 #%%
 
@@ -62,18 +63,19 @@ acc_tests = rep_knn_mult(num_reps,train_samp,concat_arr,label_feat,n)
 #    plt.show()
    
 pseudo_acc_means = gen_pseudo_mat(
-        num_chems,N,num_msgs,num_traces,labels,feat_mat_norm) 
+        num_chems,N,num_msgs,num_traces,labels,feat_mat_norm,lim_feat) 
 
+nf = np.shape(pseudo_acc_means[0])[0]
 num_below_pc = np.zeros(N)
 for k in range(N):
-    plt.loglog(pseudo_acc_means[k],'c.')
+    plt.loglog(np.array(range(nf))/nf,pseudo_acc_means[k],'c.')
     num_below_pc[k] = len(np.where(pseudo_acc_means[k]<(1-thresh))[0])
-plt.loglog(sort_mat_err(accuracy_matrix),'k.')
+plt.loglog(np.array(range(nf))/nf,sort_mat_err(accuracy_matrix),'k.')
 plt.xlabel('Features sorted by most accurate first')
 plt.ylabel('Classification error')
 plt.title('True vs. pseudo label feature accuracy comparison - black is true case')
-plt.xlim((1,1000))
-plt.ylim((.001, 1))
+plt.xlim((.01,1))
+plt.ylim((.001,1))
 plt.grid()
 plt.show()
 
@@ -105,13 +107,13 @@ for feat_ind in range(1):# range(len(c_inds)):
 
 plt.semilogy(c_inds,1 - np.mean(accuracy_matrix[c_inds,:],1),'o')
 plt.semilogy(1 - np.mean(accuracy_matrix[:,:],1),'.')
-num_sf = 219
-for i in range(8*3):
-    plt.plot((i*num_sf,i*num_sf),(.0001,.3),'k--')
+# num_sf = 219
+#for i in range(8*3):
+#    plt.plot((i*num_sf,i*num_sf),(.0001,.3),'k--')
 plt.xlabel('Feature index, V = 1...219,P=220,...')
 plt.ylabel('Error rate on chemical identification')
-plt.xlim((0,num_feats))
-plt.ylim((.0001,.3))
+# plt.xlim((0,num_feats))
+plt.ylim((.001,.3))
 plt.title('Single feature error identification rates averaged over all patterns')
 plt.savefig('destination_path.eps', format='eps', dpi=300)
 plt.show() 
@@ -142,6 +144,4 @@ ax = fig.add_subplot(1, 1, 1, axisbg="0.5")
 ax = fig.gca(projection='3d')
 ax.scatter(concat_arr[:,0],concat_arr[:,1],concat_arr[:,2],c=label_feat,s=100,cmap='Spectral')
 plt.show()
-
-
 
