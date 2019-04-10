@@ -14,6 +14,7 @@ import platform
 from functools import reduce
 from sklearn.manifold import MDS
 from sklearn.neighbors import KNeighborsClassifier
+import random
 
 #import h5py
 #import pandas as pd

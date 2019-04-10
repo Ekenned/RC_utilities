@@ -17,7 +17,7 @@ from TS_sub_functions import *
 # User inputs:
 
 wdir    = r"C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_feat_data"
-fname   = r'chem_ts_feat_long'
+fname   = r'chem_ts_feat'
 norm    = 0 # Set to 1 to normalize all data by feature range to [0,1]
 pl_num  = 0 # increase this to plot more graphs, or 0 for no func plots
 thresh  = 0.99 # Set required accuracy for a feature to be considered 'useful'
