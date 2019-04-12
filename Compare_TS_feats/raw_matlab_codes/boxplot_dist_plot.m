@@ -2,7 +2,7 @@ close all
 clear all
 clc
 
-cd('Z:\userdata\ekennedy\scripts\temp\heatervoltage')
+cd('C:\Users\Eamonn\desktop')
 load('chem_ts_feat_hv.mat')
 
 num_sens = 8;
@@ -14,32 +14,33 @@ sep_thresh = 0.5;
 num_f = length(chem_ts_feat_hv.feat_mat.EtOH);
 dist_maxmin = zeros(num_f,1);
 sep = zeros(num_f,1);
-feature_list = 1:num_f
+feature_list = 1:num_f;
 
 for i = feature_list
     
     if rem(i,10000)==0
         disp([num2str(i),'/',num2str(num_f)])
     end
-     
+    
+    % Make a 2 x num_obs matrix for the feature
     feature_vals = [chem_ts_feat_hv.feat_mat.EtOH(i,:) ; ...
                     chem_ts_feat_hv.feat_mat.Ace(i,:)]';
     
-    min_f = min(feature_vals);
-    max_f = max(feature_vals);
+    % argmin( V_EtOH - V_Ace.T ), if feature two is bigger then
+    if (median(feature_vals(:,2)) - median(feature_vals(:,1)))>0
+        min_sep_dist = min(min(feature_vals(:,2) - feature_vals(:,1)'));
+    else
+        min_sep_dist = min(min(feature_vals(:,1) - feature_vals(:,2)'));
     
-    % if the lowest value in 1 is higher than all values in 2
-    dist_sep(1) = (min_f(1) - max_f(2)); %>0
-    % or if the lowest value in 2 is higher than all values in 1
-    dist_sep(2) = (min_f(2) - max_f(1)); %>0
-    % Then some threshold of this feature will perfectly seperate the 20x2
-    % observations, so we can condense this to a binary sum check:
-    sep(i) = sum(((min_f(1) - max_f(2)) > 0) + ((min_f(2) - max_f(1)) > 0));
-    ms = median(feature_vals);
-    ms = abs(ms(2) - ms(1));
-    % With a distance metric 0.5x|max1 - min2|/|median1 - median2|
-    dist_maxmin(i) = 0.5*max(dist_sep)/ms;
-    chen_1_larger = (dist_maxmin>0);
+    end
+    % Whether or not the data is perfectly seperating
+    sep(i) = (min_sep_dist > 0);
+    % halfway point between the two chemical medians
+    ms = 0.5*abs(sum(median(feature_vals)));
+    % The feature's 90/10 qunatile range:
+    % ms = quantile(feature_vals(:),.9) - quantile(feature_vals(:),.1);
+    % Establish a distance metric 0.5x|min_dist|/|median|
+    dist_maxmin(i) = min_sep_dist/ms;
     
     if plotting == 1
         
@@ -52,8 +53,7 @@ for i = feature_list
         set(gcf,'color','white')
         axis square
         xlim([.5 2.5])
-        title(['Feature #',num2str(i),'. Identifying: ',disp_sep,...
-            '. Distance: ',num2str(100*dist_maxmin(i)),'%'])
+        title(['Feature #',num2str(i),'. Distance: ',num2str(100*dist_maxmin(i)),'%'])
         k = waitforbuttonpress;
         clf
         
@@ -61,6 +61,9 @@ for i = feature_list
     end
 
 end
+
+sep_feats = abs(dist_maxmin(sep==1));
+sep_inds = find(sep==1);
 
 figure
     plot(sep_inds,sep_feats,'.')
@@ -77,25 +80,72 @@ figure
     ylabel('Distance, [max_c_1 - min_c_2] / |med_c_1_,_2|')
     xlabel('Feature #')
     
-    
-sep_feats = abs(dist_maxmin(sep==1));
-sep_inds = find(sep==1);
 
-use_f = find(sep_feats>sep_thresh);
+use_f = find(sep_feats>=sep_thresh);
 
 subset_inds = sep_inds(use_f);
 subset_feats = sep_feats(use_f);
-figure
-[y,x] = hist((rem(subset_inds,nf)),.5:.5:nf)
+inf_rem = sep_feats(use_f) ~= inf;
+subset_inds = subset_inds(inf_rem);
+subset_feats = subset_feats(inf_rem);
 
-for i = 1:10
-fs = randsample(sep_inds,2);
+disp(length(subset_inds))
+
 figure
-    scatter(chem_ts_feat_hv.feat_mat.Ace(fs(1),:),chem_ts_feat_hv.feat_mat.Ace(fs(2),:),'fill','r')
+[y,x] = hist((rem(subset_inds,nf)),.5:.5:nf);
+stem(x,y)
+
+figure
+c = 0;
+for i = 1:2:36%length(subset_inds)
+
+    % fs = randsample(subset_inds,2);
+    fs = subset_inds([i,i+1]);
+    c = c+1;
+
+    subplot(3,6,c)
+    scatter(chem_ts_feat_hv.feat_mat.Ace(fs(1),:),chem_ts_feat_hv.feat_mat.Ace(fs(2),:),'fill','b')
     hold on
-    scatter(chem_ts_feat_hv.feat_mat.EtOH(fs(1),:),chem_ts_feat_hv.feat_mat.EtOH(fs(2),:),'fill','bs')
-    title('Acetone: red, EtOH: blue')
+    scatter(chem_ts_feat_hv.feat_mat.EtOH(fs(1),:),chem_ts_feat_hv.feat_mat.EtOH(fs(2),:),'fill','rs')
+    % title('Acetone: blue, EtOH: red')
     xlabel(num2str(fs(1)))
     ylabel(num2str(fs(2)))
+    %lgd = legend([num2str(100*subset_feats(fs(1))),'%'],...
+    %                [num2str(100*subset_feats(fs(2))),'%']);
+    %lgd.FontSize = 9;
+    axis square
+    box on
+    set(gcf,'color','white')
+
 end
 
+figure
+    plot(fliplr(sort(subset_feats)'),'o')
+    set(gcf,'color','white')
+    set(gca,'yscale','log')
+    set(gca,'xscale','log')
+    ylabel('Feature minimum seperation distance')
+    ylim([sep_thresh 100])
+    axis square
+    grid on
+    
+figure
+Ace_mat = chem_ts_feat_hv.feat_mat.Ace(subset_inds,:);
+EtOH_mat = chem_ts_feat_hv.feat_mat.EtOH(subset_inds,:);
+conc_mat = [Ace_mat , EtOH_mat ];
+conc_mat(isnan(conc_mat)) = 0;
+[coeff,score,latent] = pca(conc_mat);
+plot3(coeff(21:40,1),coeff(21:40,2),coeff(21:40,3),'rs')
+hold on
+plot3(coeff(1:20,1),coeff(1:20,2),coeff(1:20,3),'bo') % acetone is blue circles
+hold off
+box on
+grid on
+set(gcf,'color','white')
+
+feat_analysis.sub_inds = subset_inds;
+feat_analysis.sub_powers = subset_feats;
+
+feat_analysis
+
+save feat_analysis feat_analysis
