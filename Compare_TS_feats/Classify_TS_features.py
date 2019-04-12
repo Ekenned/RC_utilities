@@ -20,9 +20,10 @@ wdir    = r"C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\examp
 fname   = r'chem_ts_feat'
 norm    = 0 # Set to 1 to normalize all data by feature range to [0,1]
 pl_num  = 0 # increase this to plot more graphs, or 0 for no func plots
-thresh  = 0.99 # Set required accuracy for a feature to be considered 'useful'
-N       = 1 # Create pseudo accuracy matrices for bootstrapping
-lim_feat= 1 # Sets a limit of 5000 features if activated
+thresh  = 0.98 # Set required accuracy for a feature to be considered 'useful'
+N       = 1 # Create pseudo accuracy matrices for null test
+lim_feat= 1 # Sets a limit of 5000 features if set to 1
+train_samp = 300 # set a number of training sample observations for knn 
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -49,9 +50,21 @@ label_feat,concat_arr = concat_sub_feats(feat_mat_norm,labels,c_inds)
 # MDS_plot(feat_mat_norm,labels,c_inds)
 
 # Get multifeature knn
-num_reps = 100 ; train_samp = 400 ; n = 1 ; # knn settings
-for train_samp in np.array([5,10,20,50,100,150,200,250,300,400,500]):
-    acc_tests = rep_knn_mult(num_reps,train_samp,concat_arr[:,:],label_feat,n)
+num_reps = 100 ; n = 1 ; # knn settings
+print('True labels: ')
+acc_tests = rep_knn_mult(num_reps,train_samp,concat_arr[:,:],label_feat,n)
+
+# develop a null set with random chemical labels
+print('Pseudo labels: ')
+pseudo_labels = np.random.randint(2,size=len(label_feat))
+pseudo_acc_tests = rep_knn_mult(num_reps,train_samp,concat_arr[:,:],pseudo_labels,n)
+
+plt.hist(pseudo_acc_tests,bins=20,range=(0,1))
+plt.hist(acc_tests,bins=20,range=(0,1))
+plt.ylabel('Count')
+plt.xlabel('Accuracy')
+plt.legend
+plt.show()
 
 #%%
 
@@ -63,25 +76,25 @@ for train_samp in np.array([5,10,20,50,100,150,200,250,300,400,500]):
 #    plt.ylabel('Feature values')
 #    plt.show()
    
-pseudo_acc_means = gen_pseudo_mat(
-        num_chems,N,num_msgs,num_traces,labels,feat_mat_norm,lim_feat) 
+#pseudo_acc_means = gen_pseudo_mat(
+#        num_chems,N,num_msgs,num_traces,labels,feat_mat_norm,lim_feat) 
+#
+#nf = np.shape(pseudo_acc_means[0])[0]
+#num_below_pc = np.zeros(N)
+#for k in range(N):
+#    plt.loglog(np.array(range(nf)),pseudo_acc_means[k],'c.')
+#    num_below_pc[k] = len(np.where(pseudo_acc_means[k]<(1-thresh))[0])
+## plt.loglog(np.array(range(nf)),sort_mat_err(accuracy_matrix),'k.')
+#plt.xlabel('Features sorted by most accurate first')
+#plt.ylabel('Classification error')
+#plt.title('True vs. pseudo label feature accuracy comparison - black is true case')
+#plt.xlim((10,10000))
+#plt.ylim((.001,1))
+#plt.grid()
+#plt.show()
 
-nf = np.shape(pseudo_acc_means[0])[0]
-num_below_pc = np.zeros(N)
-for k in range(N):
-    plt.loglog(np.array(range(nf)),pseudo_acc_means[k],'c.')
-    num_below_pc[k] = len(np.where(pseudo_acc_means[k]<(1-thresh))[0])
-plt.loglog(np.array(range(nf)),sort_mat_err(accuracy_matrix),'k.')
-plt.xlabel('Features sorted by most accurate first')
-plt.ylabel('Classification error')
-plt.title('True vs. pseudo label feature accuracy comparison - black is true case')
-plt.xlim((10,10000))
-plt.ylim((.001,1))
-plt.grid()
-plt.show()
-
-for i in range(len(c_inds)):
-    print('Feature ',c_inds[i],':',np.sum(accuracy_matrix[c_inds[i],:]==1),'/',num_msgs,'patterns had all repetitions correctly identified')
+#for i in range(len(c_inds)):
+#    print('Feature ',c_inds[i],':',np.sum(accuracy_matrix[c_inds[i],:]==1),'/',num_msgs,'patterns had all repetitions correctly identified')
 
 # ----------------------------------------------------------------------------    
 #%%
@@ -108,16 +121,25 @@ for feat_ind in range(1):# range(len(c_inds)):
 
 plt.semilogy(c_inds,1 - np.mean(accuracy_matrix[c_inds,:],1),'o')
 plt.semilogy(1 - np.mean(accuracy_matrix[:,:],1),'.')
-num_sf = 7642
-for i in range(3*3):
-    plt.plot((i*num_sf,i*num_sf),(.0001,.3),'k--')
-plt.xlabel('Feature index, V = 1...219,P=220,...')
+#num_sf = 7642*2*2
+#for i in range(3*3):
+#    plt.plot((i*num_sf,i*num_sf),(.0001,.3),'k--')
+plt.xlabel('Feature index, V = 1...N,...')
 plt.ylabel('Error rate on chemical identification')
 plt.xlim((0,num_feats))
 plt.ylim((.001,.1))
 # plt.title('Single feature error identification rates averaged over all patterns')
 # plt.savefig('Chemical_classification_byfeat.eps', format='eps', dpi=100)
 plt.show() 
+
+feat_list = np.where(np.mean(accuracy_matrix,1)==1)[0]
+
+#
+#recurring_feats = np.remainder(feat_list,7642*2*2)
+#
+#obs_reps = np.histogram(recurring_feats,bins=2*2*7642,range=(0,2*2*7642))
+#plt.plot(obs_reps[1][1::],obs_reps[0])
+#plt.show()
 
 #threshold = np.array([.9,.95,.98,.99,.995])
 #threshold = np.linspace(.7,1,1000)

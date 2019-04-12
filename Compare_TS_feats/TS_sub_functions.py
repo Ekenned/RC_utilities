@@ -91,7 +91,14 @@ def knn1d(num_obs,vals,labels):
         distances[i] = np.max(distances) + 1 # rule out the value itself
         label_1nn[i] = labels[np.where(distances==np.min(distances))[0][0]]
         sing_acc = np.sum(1*(labels==label_1nn))/num_obs
-    return sing_acc         
+    return sing_acc    
+
+# Need to generalize this to N chems, with median sorted 
+def check_2chem_sep(vals,labels):
+    c1_vals = vals[labels==0]
+    c2_vals = vals[labels==1]
+    sep = ((max(c2_vals)<min(c1_vals)) or (max(c1_vals)<min(c2_vals)))
+    return sep
 
 # Generate an accuracy for every feature and pattern for N chemicals
 def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num,lim_feat):
@@ -102,6 +109,7 @@ def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num,lim_feat):
             num_feats=5000
     num_msgs = len(np.unique(labels[0]))
     acc = np.zeros(num_msgs)
+    check_sep = acc
     accuracy_matrix = np.zeros((num_feats,num_msgs))
     num_chems = len(feat_mat_norm.keys())
     
@@ -134,10 +142,14 @@ def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num,lim_feat):
                 plt.yticks([])
             
             acc[trace_num] = knn1d(int(net_obs),vals_feat,label_feat)
-        
-        if np.remainder(f,100)==0:    
-            print(f,np.median(acc))
-           
+            
+            if num_chems==2:
+                check_sep[trace_num] = check_2chem_sep(vals_feat,label_feat)  
+                    
+
+        if np.remainder(f,10)==0: 
+            if np.mean(acc)>0:
+                print(f,', acc: ', np.mean(acc))
         plt.show()
             
         accuracy_matrix[f,:] = acc
@@ -227,7 +239,7 @@ def rep_knn_mult(num_reps,train_samp,concat_arr,label_feat,n):
     for i in range(num_reps):
         acc_tests[i] = knn_mult(train_samp,concat_arr,label_feat,n)
     print('Classification error: ',1 - np.median(acc_tests))
-    print(' \n ')
+    # print(' \n ')
     return acc_tests
 
 def factors(n):    

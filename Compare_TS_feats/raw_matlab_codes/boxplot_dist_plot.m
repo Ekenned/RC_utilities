@@ -2,29 +2,29 @@ close all
 clear all
 clc
 
-cd('C:\Users\Eamonn\desktop')
+cd('C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_feat_data')
 load('chem_ts_feat_hv.mat')
 
 num_sens = 8;
 nf = 7642;
 ylims = [.1 100];
 plotting = 0;
-sep_thresh = 0.5;
+sep_thresh = 1;
 
 num_f = length(chem_ts_feat_hv.feat_mat.EtOH);
 dist_maxmin = zeros(num_f,1);
 sep = zeros(num_f,1);
 feature_list = 1:num_f;
 
-for i = feature_list
+for i = 1:length(feature_list)
     
     if rem(i,10000)==0
         disp([num2str(i),'/',num2str(num_f)])
     end
     
     % Make a 2 x num_obs matrix for the feature
-    feature_vals = [chem_ts_feat_hv.feat_mat.EtOH(i,:) ; ...
-                    chem_ts_feat_hv.feat_mat.Ace(i,:)]';
+    feature_vals = [chem_ts_feat_hv.feat_mat.EtOH(feature_list(i),:) ; ...
+                    chem_ts_feat_hv.feat_mat.Ace(feature_list(i),:)]';
     
     % argmin( V_EtOH - V_Ace.T ), if feature two is bigger then
     if (median(feature_vals(:,2)) - median(feature_vals(:,1)))>0
@@ -39,7 +39,8 @@ for i = feature_list
     ms = 0.5*abs(sum(median(feature_vals)));
     % The feature's 90/10 qunatile range:
     % ms = quantile(feature_vals(:),.9) - quantile(feature_vals(:),.1);
-    % Establish a distance metric 0.5x|min_dist|/|median|
+    % The range of the feature observed over all chemicals % ms = max_sep_dist;
+    % Establish a distance metric, e.g. 0.5x|min_dist|/|median|
     dist_maxmin(i) = min_sep_dist/ms;
     
     if plotting == 1
@@ -64,6 +65,7 @@ end
 
 sep_feats = abs(dist_maxmin(sep==1));
 sep_inds = find(sep==1);
+feature_list = sep_inds(find(sep_feats>.8));
 
 figure
     plot(sep_inds,sep_feats,'.')
@@ -128,7 +130,9 @@ figure
     ylim([sep_thresh 100])
     axis square
     grid on
-    
+
+%sub_inds = subset_inds;
+% subset_inds = subset_inds(find(subset_feats==max(subset_feats)));
 figure
 Ace_mat = chem_ts_feat_hv.feat_mat.Ace(subset_inds,:);
 EtOH_mat = chem_ts_feat_hv.feat_mat.EtOH(subset_inds,:);
