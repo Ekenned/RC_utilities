@@ -2,14 +2,14 @@ close all
 clear all
 clc
 
-cd('C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_feat_data')
+cd('Z:\userdata\ekennedy\Plume\twuffle\RC\hv')
 load('chem_ts_feat_hv.mat')
 
 num_sens = 8;
 nf = 7642;
 ylims = [.1 100];
 plotting = 0;
-sep_thresh = 1;
+sep_thresh = 0.5;
 
 num_f = length(chem_ts_feat_hv.feat_mat.EtOH);
 dist_maxmin = zeros(num_f,1);
@@ -96,7 +96,9 @@ disp(length(subset_inds))
 figure
 [y,x] = hist((rem(subset_inds,nf)),.5:.5:nf);
 stem(x,y)
-
+[a,b] = sort(y);
+ranked_features = fliplr(b);
+x = x(ranked_features);
 figure
 c = 0;
 for i = 1:2:36%length(subset_inds)
