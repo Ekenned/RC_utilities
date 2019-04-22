@@ -16,14 +16,18 @@ from TS_sub_functions import *
 # ----------------------------------------------------------------------------
 # User inputs:
 
-wdir    = r"C:\Users\Eamonn\Documents\GitHub\RC_utilities\Compare_TS_feats\example_feat_data"
-fname   = r'chem_ts_feat'
+wdir    = r"E:\TB_data\conc\features\catch22"
+fname   = r'chem_ts_feat_conc'
 norm    = 0 # Set to 1 to normalize all data by feature range to [0,1]
-pl_num  = 0 # increase this to plot more graphs, or 0 for no func plots
-thresh  = 0.98 # Set required accuracy for a feature to be considered 'useful'
+pl_num  = 1 # increase this to plot more graphs, or 0 for no func plots
+thresh  = 0.8 # Set required accuracy for a feature to be considered 'useful'
 N       = 1 # Create pseudo accuracy matrices for null test
 lim_feat= 1 # Sets a limit of 5000 features if set to 1
-train_samp = 300 # set a number of training sample observations for knn 
+train_samp = 30 # set a number of training sample observations for knn 
+
+concs = {}
+concs['EtOH']    = np.array([0, 347.3,868.2, 1736.5, 2604.7, 3473.0, 4341.2])
+concs['Acetone'] = np.array([0, 1805, 4512,  9024,   13536,  18048,  22561])
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -37,9 +41,13 @@ num_feats,chem_names,feat_dict,label_dict = load_TS_feat_mfile(wdir,fname)
 chem_name,num_chems,num_traces,num_msgs,labels,feat_mat_norm = (
         get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm))
 
+# Generate true accuracy for every feature by chemical
+accuracy_vec = chem_acc_vec(num_traces,feat_mat_norm,plot_feat_num,lim_feat)
+
+#%%
 # Generate true accuracy for every feature and every pattern, num_traces may vary
 accuracy_matrix = mult_acc_matrix(num_traces,labels,feat_mat_norm,pl_num,lim_feat)
-
+print('Matrix loaded')
 # Find useful features above some threshold
 c_inds = np.where(np.mean(accuracy_matrix,1)>thresh )[0]
 
@@ -95,6 +103,9 @@ plt.show()
 
 #for i in range(len(c_inds)):
 #    print('Feature ',c_inds[i],':',np.sum(accuracy_matrix[c_inds[i],:]==1),'/',num_msgs,'patterns had all repetitions correctly identified')
+
+
+# np.sort(np.remainder(np.where(np.mean(accuracy_matrix,1)>0.8)[0],22))
 
 # ----------------------------------------------------------------------------    
 #%%
