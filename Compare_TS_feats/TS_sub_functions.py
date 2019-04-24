@@ -90,7 +90,7 @@ def knn1d(num_obs,vals,labels):
         distances = np.abs(vals - vals[i])
         distances[i] = np.max(distances) + 1 # rule out the value itself
         label_1nn[i] = labels[np.where(distances==np.min(distances))[0][0]]
-        sing_acc = np.sum(1*(labels==label_1nn))/num_obs
+    sing_acc = np.sum(1*(labels==label_1nn))/num_obs
     return sing_acc    
 
 # Need to generalize this to N chems, with median sorted 
@@ -124,13 +124,14 @@ def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num,lim_feat):
             v = {}
             num_obs = np.zeros(num_chems)
             vals_feat = np.array([])
-            label_feat = np.array([])
+            label_feat = np.array([]) # chemical labels
             for c in range(num_chems):
+                # for the fth feature, take only those traces where the label is = value
                 v[c] = feat_mat_norm[c][f,np.where(labels[c]==trace_num+1)[0]]
                 num_obs[c] = len(v[c])
                 vals_feat = np.append(vals_feat,v[c])
                 label_feat = np.append(label_feat,c*(np.ones(int(num_obs[c]))))
-            net_obs = sum(num_obs)
+            net_obs = int(sum(num_obs))
 
             if f<plot_feat_num: 
                 x,y = get_best_subplot(num_msgs)
@@ -141,19 +142,20 @@ def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num,lim_feat):
                 # plt.ylim((0,1))
                 plt.yticks([])
             
-            acc[trace_num] = knn1d(int(net_obs),vals_feat,label_feat)
+            acc[trace_num] = knn1d(net_obs,vals_feat,label_feat)
             
-            if num_chems==2:
-                check_sep[trace_num] = check_2chem_sep(vals_feat,label_feat)  
-                    
+            #if num_chems==2:
+            #    check_sep[trace_num] = check_2chem_sep(vals_feat,label_feat)  
 
         if np.remainder(f,10)==0: 
             if np.mean(acc)>0:
                 print(f,', acc: ', np.mean(acc))
         plt.show()
-            
+        
         accuracy_matrix[f,:] = acc
     # print('Feature x Pattern Accuracy matrix complete')
+    accuracy_matrix[np.isnan(accuracy_matrix)] = 0 # remove nan entries
+    accuracy_matrix[~np.isfinite(accuracy_matrix)] = 0 # remove infinite entries     
     return accuracy_matrix
 
 # Plot sorted accuracy matrix mean errors
@@ -163,7 +165,6 @@ def sort_mat_err(mat):
 
 # Generate entire accuracy matrix for some pseudo labels N times, return means
 def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm,lim_feat):
-
 
     pseudo_acc_means = {}
     for k in range(N):
@@ -215,6 +216,60 @@ def MDS_plot(feat_mat_norm,labels,c_inds):
         plt.scatter(arr_trans[inds,0],arr_trans[inds,1],marker=marker_list[c])
     plt.title('2-component reduction of discriminating feature')
     plt.show()
+    
+# Generate a concatenated list of N-chemical labels for traces [0,0,0...N,N,N]
+def gen_chem_labels(num_traces):
+    chem_labels = np.array([])
+    for c in range(len(num_traces)):
+        chem_labels = np.append(chem_labels,c*(np.ones(int(num_traces[c]))))
+    return chem_labels
+
+# Gather and append all values for 1 feature 'f' for all chemicals
+def append_chem_vals(feat_mat_norm,f):
+    chem_vals= np.array([])
+    for c in range(len(feat_mat_norm.keys())):
+        chem_vals = np.append(chem_vals,feat_mat_norm[c][f,:])
+    return chem_vals
+
+# Generate an accuracy for every feature and pattern for N chemicals
+def chem_acc_vec(num_traces,feat_mat_norm,plot_feat_num,lim_feat):
+    
+    chem_labels = gen_chem_labels(num_traces) # generate chemical labels
+    num_chems = len(num_traces) # len(feat_mat_norm.keys())
+    num_feats = np.shape(feat_mat_norm[0])[0] # just define this internally
+    net_obs = int(sum(num_traces)) # total trace observations for all chems
+    
+    if lim_feat == 1: # optionally limit to 5000 features for time saving, etc
+        if num_feats>5000:
+            num_feats=5000
+
+    accuracy_vec = np.zeros(num_feats)
+    
+    for f in range(num_feats):
+        
+        # Append all features values for all chemicals, perform knn calculation    
+        vals_feat = append_chem_vals(feat_mat_norm,f)
+        chem_labels = gen_chem_labels(num_traces)
+        accuracy_vec[f] = knn1d(net_obs,vals_feat,chem_labels)
+
+        # Plotting and printing
+        #if f<plot_feat_num: 
+        # if its the best feature yet, and above 50% accurate, plot it out
+        if accuracy_vec[f]>=np.max([np.max(accuracy_vec),0.7]):
+            plt.scatter(range(len(vals_feat)),vals_feat,c=chem_labels,vmin=-.5,vmax=1.5)
+            plt.title(f) 
+            plt.xlabel('Trace #, all chems')
+            plt.ylabel('Feature value')
+        plt.show()
+#        if f == round(num_feats/2):
+#            print('Halfway through features... (', f,'/',num_feats,')')
+        if np.remainder(f,100)==0: 
+            print(f,'/',num_feats,', chem acc: ', accuracy_vec[f])
+            
+    # Data cleaning
+    accuracy_vec[np.isnan(accuracy_vec)] = 0 # remove nan entries
+    accuracy_vec[~np.isfinite(accuracy_vec)] = 0 # remove infinite entries     
+    return accuracy_vec
     
 def knn_mult(train_samp,concat_arr,label_feat,n):
     
