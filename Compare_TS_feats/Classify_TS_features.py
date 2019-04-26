@@ -14,161 +14,115 @@ from TS_sub_functions import *
  
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
-# User inputs:
+# Required user inputs:
 
-wdir    = r"E:\TB_data\3_chem_mult_pattern"
-fname   = r'chem_ts_feat_long'
-norm    = 0 # Set to 1 to normalize all data by feature range to [0,1]
-pl_num  = 0 # increase this to plot more graphs, or 0 for no func plots
-thresh  = 0.99 # Set required accuracy for a feature to be considered 'useful'
-lim_feat= 1 # Sets a limit of 5000 features if set to 1
-train_samp = 30 # set a number of training sample observations for knn 
+wdir    = r"E:\TB_data\20190321_3chem_low_conc\features"
+fname   = r'chem_ts_feat_low_conc_9f'
 
-#concs = {}
-#concs['EtOH']    = np.array([0, 347.3,868.2, 1736.5, 2604.7, 3473.0, 4341.2])
-#concs['Acetone'] = np.array([0, 1805, 4512,  9024,   13536,  18048,  22561])
+# Optional user inputs:
 
-#3chem inds: array([    1,     2,     3,     4,     5,     6,     7,     8,     9,
-#          15,  3194,  3199,  7640, 22941, 22944, 30567]
+# n_feats = 10 # Set a number of features to include for further analysis
+# norm = 1 # Set to 1 to normalize all data by feature range to [0,1]
+# lim_feat= 1 # Sets a limit of 5000 features if set to 1
+# pl_num = 1 # increase this to plot more graphs, or 0 for no func plots
+# num_reps = 100 # Number of validations for knn
+# train_frac = 0.5 # Fraction of traces to use for knn training/testing
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
 
 load_settings()
 
-# Load the data
-num_feats,chem_names,feat_dict,label_dict = load_TS_feat_mfile(wdir,fname)
+# Load the data dictionaries for chemicals, features and labels
+n_feats,c_dict,f_dict,l_dict = load_TS_feat_mfile(wdir,fname)
 
-# infer basic data attributes and optionally normalize data
-chem_name,num_chems,num_traces,num_msgs,labels,feat_mat_norm = (
-        get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm))
+# Gather data into matrices and optionally normalize feature array
+c_names,n_chems,n_traces,n_msgs,labels,feat_mat = get_arrays(c_dict,f_dict,l_dict)
 
-# Generate 1-out 1 knn accuracy for every feature by chemical
-accuracy_vec = chem_acc_vec(num_traces,feat_mat_norm,pl_num,lim_feat)
+# Generate 1-out 1 knn accuracy for every feature discriminating N chemicals
+accuracy_vec = chem_acc_vec(n_traces,feat_mat)
 
-c_inds = np.where(accuracy_vec>thresh)[0] # Find useful features (above threshold)
+thresh,c_inds = get_best_feats(accuracy_vec) # Find useful features (above threshold)
 
 # Concatenate a subset array of useful features
-label_feat,concat_arr = concat_sub_feats(feat_mat_norm,c_inds)
+label_feat,concat_arr = concat_sub_feats(feat_mat,c_inds)
 
-MDS_plot(feat_mat_norm,labels,c_inds)
+# Concatenate a subset array of useful features
+MDS_plot(feat_mat,labels,c_inds)
 
-# Generate true accuracy for every feature and every pattern, num_traces may vary
-accuracy_matrix = mult_acc_matrix(num_traces,labels,feat_mat_norm,pl_num,lim_feat)
+# Generate true accuracy for every feature and every pattern, n_traces may vary
+accuracy_matrix = mult_acc_matrix(n_traces,labels,feat_mat)
 
-# Get multifeature knn
-num_reps = 100 ; n = 1 ; # knn settings
+# Get multifeature knn and randomized label knn
 print('True labels: ')
-acc_tests = rep_knn_mult(num_reps,train_samp,concat_arr[:,:],label_feat,n)
+acc_tests = rep_knn_mult(concat_arr,label_feat)# n=1,num_reps=100,train_frac=0.5
 
 # develop a null set with random chemical labels
 print('Pseudo labels: ')
 pseudo_labels = np.random.randint(2,size=len(label_feat))
-pseudo_acc_tests = rep_knn_mult(num_reps,train_samp,concat_arr[:,:],pseudo_labels,n)
-
-#%%
-
-# plot the first feature for all chemicals for all patterns
-#if pl_num > 0:
-#    for c in range(num_chems):        
-#        plt.scatter(labels[c],feat_mat_norm[c][0,:])   
-#    plt.xlabel('message ID')
-#    plt.ylabel('Feature values')
-#    plt.show()
-   
-#pseudo_acc_means = gen_pseudo_mat(
-#        num_chems,N,num_msgs,num_traces,labels,feat_mat_norm,lim_feat) 
-#
-#nf = np.shape(pseudo_acc_means[0])[0]
-#num_below_pc = np.zeros(N)
-#for k in range(N):
-#    plt.loglog(np.array(range(nf)),pseudo_acc_means[k],'c.')
-#    num_below_pc[k] = len(np.where(pseudo_acc_means[k]<(1-thresh))[0])
-## plt.loglog(np.array(range(nf)),sort_mat_err(accuracy_matrix),'k.')
-#plt.xlabel('Features sorted by most accurate first')
-#plt.ylabel('Classification error')
-#plt.title('True vs. pseudo label feature accuracy comparison - black is true case')
-#plt.xlim((10,10000))
-#plt.ylim((.001,1))
-#plt.grid()
-#plt.show()
-
-#for i in range(len(c_inds)):
-#    print('Feature ',c_inds[i],':',np.sum(accuracy_matrix[c_inds[i],:]==1),'/',num_msgs,'patterns had all repetitions correctly identified')
+pseudo_acc_tests = rep_knn_mult(concat_arr,pseudo_labels)
 
 
-# np.sort(np.remainder(np.where(np.mean(accuracy_matrix,1)>0.8)[0],22))
+#%% Output various plots 
+# ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
-# ----------------------------------------------------------------------------    
-#%%
-# Output various plots 
-# Plot the pseudo and true knn test outputs
-plt.hist(pseudo_acc_tests,bins=20,range=(0,1))
-plt.hist(acc_tests,bins=20,range=(0,1))
-plt.ylabel('Count')
-plt.xlabel('Accuracy')
-plt.legend
+# Plot the accuracies for num_rep training splits for true and pseudo label knn:
+hist_acc(pseudo_acc_tests)
+hist_acc(acc_tests)
 plt.show()
 
-# Plot the mean accuracy for only these useful features
+# plot the values for a feature 'f' for all chemicals by label
+f =  np.where(accuracy_vec==np.max(accuracy_vec))[0][0] # the best feature
+plot_feature(f,feat_mat,labels,n_chems)
+# np.sort(np.remainder(np.where(accuracy_vec>thresh)[0],9))
+
+# Plot the mean accuracy for only useful features
 plt.stem(1 - np.mean(accuracy_matrix[c_inds,:],0))
 plt.xlabel('Pattern ID')
 plt.ylabel('Error')
 plt.title('Average error rates by pattern, using features above threshold')
 plt.show()
-
-#for feat_ind in range(1):# range(len(c_inds)):
-#    
-#    chem = {}
-#    for c in range(num_chems):
-#        chem[c] = feat_mat_norm[c][c_inds[feat_ind],:]    
-#        plt.plot(labels[c],chem[c],'.')
-#    
-#    plt.xlabel('Pattern ID')
-#    plt.ylabel('Feature value')
-#    plt.title('Plot of the final discriminating feature values by chemical-color')
-#    plt.show()
-#    
-
-plt.semilogy(1 - accuracy_vec,'.')
-plt.xlabel('Feature index, V = 1...N,...')
-plt.ylabel('Error rate on chemical identification')
-plt.xlim((0,num_feats))
-plt.ylim((.001,1))
-plt.title('Single feature error identification rates')
-plt.show()
-
-# Plot all the feature error rates on log scale
-plt.plot(c_inds,1 - accuracy_vec[c_inds],'o')
-plt.plot(1 - accuracy_vec,'.')
-plt.xlabel('Feature index, V = 1...N,...')
-plt.ylabel('Error rate on chemical identification')
-plt.xlim((0,num_feats)) # num_feats
-plt.ylim((-.01,.1))
-plt.title('Single feature error identification rates')
-# plt.savefig('Chemical_classification_byfeat.eps', format='eps', dpi=100)
-plt.show() 
+    
+# Plot out all the accuracies by feature in linear and log scales:
+line_dist = 72
+plot_all_feat_accs(accuracy_vec,line_dist)
 
 # Look for recurring features
-recurring_feats = np.remainder(c_inds,7642)
-obs_reps = np.histogram(recurring_feats,bins=7642,range=(0,7642))
+rec_f = 9 # number of features measured per variable
+recurring_feats = np.remainder(c_inds,rec_f)
+obs_reps = np.histogram(recurring_feats,bins=rec_f,range=(0,rec_f))
 plt.bar(obs_reps[1][1::],obs_reps[0])
 plt.xlabel('Recurrent feature index')
 plt.ylabel('Feature observation count')
 plt.show()
 
-
-# Plot features with color for label and marker for chemical
-fs = [2,3]
+#repnum = 36 # Just a feature group size repeat one the figures over
+#max_val = np.zeros(repnum)
+#for i in range(repnum):
+#    max_val[i] = np.max(accuracy_vec[i::repnum])
+#plt.stem(max_val)
+##for i in range(4):
+##    plt.plot([i*9-.5,i*9-.5],[0, 1],'k')
+#plt.ylim((0,1))
+#plt.xlabel('Feature repeat #')
+#plt.ylabel('Max accuracy')
+#plt.show()
+   
+# Plot 2 features with color for label and marker for chemical
+fs = [0,1]
 lbl_concat = gen_label_concat(labels)
 markers = "so^x."
 for c in labels.keys():
     inds = np.where(label_feat==c)[0]
     m = markers[c]
-    plt.scatter(concat_arr[inds,fs[0]],concat_arr[inds,fs[1]],c=lbl_concat[0:int(num_traces[c])],marker = m)
-plt.legend(chem_names)
+    # plt.scatter(concat_arr[inds,fs[0]],concat_arr[inds,fs[1]],c=lbl_concat[0:int(n_traces[c])],marker = m)
+    plt.scatter(concat_arr[inds,fs[0]],concat_arr[inds,fs[1]],marker = m)
+plt.legend(c_names)
 plt.xlabel('Feature #' + str(fs[0]))
 plt.ylabel('Feature #' + str(fs[1]))
+           
+           
 #threshold = np.array([.9,.95,.98,.99,.995])
 #threshold = np.linspace(.7,1,1000)
 #acc_feats = np.zeros(len(threshold))
@@ -185,8 +139,8 @@ plt.ylabel('Feature #' + str(fs[1]))
 #plt.grid()
 #plt.show() 
 
-# plt.plot(feat_mat_norm[0][c_inds,20:150],'k.');
-# plt.plot(feat_mat_norm[1][c_inds,20:150],'c.')
+# plt.plot(feat_mat[0][c_inds,20:150],'k.');
+# plt.plot(feat_mat[1][c_inds,20:150],'c.')
 #plt.scatter(range(len(vals_feat)),vals_feat,c=label_feat)
 #plt.plot(label_1nn)
 #axes = 3

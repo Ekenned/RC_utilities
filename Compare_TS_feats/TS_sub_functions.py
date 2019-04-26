@@ -47,12 +47,14 @@ def load_TS_feat_mfile(wdir,fname):
     label_dict = TSF_data[fname]['labels'][0][0]
     feat_dict = TSF_data[fname]['feat_mat'][0,0]
     chem_names = TSF_data[fname]['chem_names'][0,0]
-    num_chems = np.shape(chem_names)[0]
+    # num_chems = np.shape(chem_names)[0]
     num_feats = np.shape(feat_dict[0][chem_names[0][0][0]][0])[0]
     
     return num_feats,chem_names,feat_dict,label_dict
 
-def get_mfile_arrays(num_feats,chem_names,feat_dict,label_dict,norm):
+def get_arrays(chem_names,feat_dict,label_dict,norm=0):
+    
+    num_feats = np.shape(feat_dict[0][0][0])[0] # get the # features per trace
     
     # Core information, pattern labels, features, chemicals for dictionaries
     labels = {}
@@ -108,24 +110,6 @@ def knn1d(num_obs,vals,labels):
 def sort_mat_err(mat):
     mean_errs = 1 - np.sort(np.mean(mat,1))[::-1]
     return mean_errs
-
-# Generate entire accuracy matrix for some pseudo labels N times, return means
-def gen_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm,lim_feat):
-
-    pseudo_acc_means = {}
-    for k in range(N):
-        print('Developing pseudo-accuracies for label set #',k,'/',N-1)
-        
-        # Perform a pseudo random label bootstrap, first develop the random labels
-        pseudo_labels = {}
-        for i in range(num_chems):
-            pseudo_labels[i] = 1 + np.random.choice(int(num_msgs),int(num_traces[i]))
-        
-        # Applt the pseudo labels to develop an accuracy matrix, and mean vector
-        pseudo_acc_mat = mult_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0,lim_feat)
-        pseudo_acc_means[k] = sort_mat_err(pseudo_acc_mat)
-        
-    return pseudo_acc_means
 
 # Concatenate all chemical data, reduce matrix to features 'c_inds' of interest
 def concat_sub_feats(feat_mat_norm,c_inds):
@@ -185,7 +169,7 @@ def append_chem_vals(feat_mat_norm,f):
     return chem_vals
 
 # Generate an accuracy for N chemicals by feature
-def chem_acc_vec(num_traces,feat_mat_norm,plot_feat_num,lim_feat):
+def chem_acc_vec(num_traces,feat_mat_norm,plot_feat_num=0,lim_feat=0,feat_lim=5000):
     
     chem_labels = gen_chem_labels(num_traces) # chem labels
     randomize_labels = 0
@@ -197,8 +181,8 @@ def chem_acc_vec(num_traces,feat_mat_norm,plot_feat_num,lim_feat):
     net_obs = int(sum(num_traces)) # total trace observations for all chems
     
     if lim_feat == 1: # optionally limit to 5000 features for time saving, etc
-        if num_feats>5000:
-            num_feats=5000
+        if num_feats>feat_lim:
+            num_feats=feat_lim
 
     accuracy_vec = np.zeros(num_feats)
     
@@ -222,15 +206,22 @@ def chem_acc_vec(num_traces,feat_mat_norm,plot_feat_num,lim_feat):
             print(f,'/',num_feats,', chem acc: ', accuracy_vec[f])
             
     # Data cleaning
-    accuracy_vec = zero_nan_and_infs(accuracy_vec) # remove nans/infs  
+    accuracy_vec = zero_nan_and_infs(accuracy_vec) # remove nans/infs            
     return accuracy_vec
     
-def knn_mult(train_samp,concat_arr,label_feat,n):
+def get_best_feats(accuracy_vec,n_feats=10):
+    if len(accuracy_vec)<n_feats: # default to all features if < n_feats
+        n_feats = len(accuracy_vec)
+    thresh = np.sort(accuracy_vec)[::-1][n_feats]
+    return thresh,np.where(accuracy_vec>=thresh)[0] # Find useful features (above threshold)
+
+# Repeat knn with different randomized training labels for validation   
+def knn_mult(train_frac,concat_arr,label_feat,n):
     
     # train_samp = 500; n = 3
     classifier = KNeighborsClassifier(n_neighbors = n)  
     ns = np.shape(concat_arr)
-    
+    train_samp = np.round(train_frac*ns[0]).astype(int)
     train_lbls = np.random.choice(ns[0], size = train_samp, replace=False)
     test_lbls = np.setdiff1d(range(ns[0]),train_lbls)
     
@@ -242,14 +233,31 @@ def knn_mult(train_samp,concat_arr,label_feat,n):
     return acc_test # ,acc_net
 
 # Repeat multifeature knn N times
-def rep_knn_mult(num_reps,train_samp,concat_arr,label_feat,n):
-    # num_reps = 100; train_samp = 400 ; n = 1;
+def rep_knn_mult(concat_arr,label_feat,n=1,num_reps=100,train_frac=0.5):
     acc_tests = np.zeros(num_reps)
     for i in range(num_reps):
-        acc_tests[i] = knn_mult(train_samp,concat_arr,label_feat,n)
+        acc_tests[i] = knn_mult(train_frac,concat_arr,label_feat,n)
     print('Classification error: ',1 - np.median(acc_tests))
     # print(' \n ')
     return acc_tests
+        
+# Generate entire accuracy matrix for some pseudo labels, repeat N times, return means
+def gen_pseudo_mat(num_chems,num_msgs,num_traces,N,labels,feat_mat_norm,lim_feat=0):
+
+    pseudo_acc_means = {}
+    for k in range(N):
+        print('Developing pseudo-accuracies for label set #',k,'/',N-1)
+        
+        # Perform a pseudo random label bootstrap, first develop the random labels
+        pseudo_labels = {}
+        for i in range(num_chems):
+            pseudo_labels[i] = 1 + np.random.choice(int(num_msgs),int(num_traces[i]))
+        
+        # Applt the pseudo labels to develop an accuracy matrix, and mean vector
+        pseudo_acc_mat = mult_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0,lim_feat)
+        pseudo_acc_means[k] = sort_mat_err(pseudo_acc_mat)
+        
+    return pseudo_acc_means
 
 def factors(n):    
     return set(reduce(list.__add__, 
@@ -306,12 +314,12 @@ def check_2chem_sep(vals,labels):
     return sep
 
 # Generate an accuracy for every feature and pattern for N chemicals
-def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num,lim_feat):
+def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num=0,lim_feat=0,feat_lim=5000):
 
     num_feats = np.shape(feat_mat_norm[0])[0] # just define these internally
     if lim_feat == 1: # optionally limit to 5000 features for time, etc
-        if num_feats>5000:
-            num_feats=5000
+        if num_feats>feat_lim:
+            num_feats=feat_lim
     num_msgs = len(np.unique(labels[0]))
     acc = np.zeros(num_msgs)
     check_sep = acc
@@ -361,6 +369,75 @@ def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num,lim_feat):
     # print('Feature x Pattern Accuracy matrix complete')
     accuracy_matrix = zero_nan_and_infs(accuracy_matrix)  
     return accuracy_matrix
+
+#################################################################################
+# Plotting functions
+    
+def plot_feature(f,feat_mat,labels,n_chems):
+    for c in range(n_chems):        
+        plt.scatter(labels[c],feat_mat[c][f,:])   
+        plt.xlabel('Class label')
+        plt.ylabel('Feature value')
+        plt.title(f)
+    plt.show()
+
+# Plot the pseudo and true knn test outputs
+def hist_acc(acc,lin_dist = 1000 ):
+    plt.hist(acc,bins=20,range=(0,1))
+    plt.ylabel('Validation count')
+    plt.xlabel('Accuracy')
+
+# Plot out all the feature accuracies in linear and log scales
+def plot_all_feat_accs(accuracy_vec,line_dist):
+    
+    # Plot all the feature error rates on linear scale
+    plt.semilogy(1 - accuracy_vec,'.')
+    feat_plot_details(accuracy_vec,line_dist,ylims=[.001,1])
+    plt.show()
+    
+    # Plot all the feature error rates on log scale
+    plt.plot(1 - accuracy_vec,'o')
+    feat_plot_details(accuracy_vec,line_dist,ylims=[-.01,.1])
+    plt.show()
+        
+def feat_plot_details(accuracy_vec,line_dist,ylims):
+    
+    plt.xlabel('Feature index, V = 1...N,...')
+    plt.ylabel('Error rate on chemical identification')
+    plt.xlim((0,len(accuracy_vec)+1)) # num_feats
+    plt.ylim(ylims)
+    plt.title('Single feature error identification rates')
+    i = 0
+    while i*line_dist<len(accuracy_vec):
+        i += 1
+        plt.plot([i*line_dist,i*line_dist],ylims,'k--')
+
+def plot_rec_feats(c_inds,rec_f = 9):      
+    # Look for recurring features
+    recurring_feats = np.remainder(c_inds,rec_f)
+    obs_reps = np.histogram(recurring_feats,bins=rec_f,range=(0,rec_f))
+    plt.bar(obs_reps[1][1::],obs_reps[0])
+    plt.xlabel('Recurrent feature index')
+    plt.ylabel('Feature observation count')
+    plt.show()
+
+
+#################################################################################
+
+def gen_feature_list(good_feats,good_sensors,feats_per_sensor):
+    z = np.zeros(good_sensors.size * good_feats.size)
+    counter = 0
+    for i in feats_per_sensor*good_sensors:
+        for j in good_feats:
+            z[counter] = np.int(i + j)
+            counter += 1
+    return z
+  
+#good_feats = np.array([3,5,30,32,33])
+#good_sensors = np.array([0,2,4,6,8,10,12,14,15])
+#feats_per_sensor = 36      
+#est_feats = gen_feature_list(good_feats,good_sensors,feats_per_sensor).astype(int)
+
     
 # Generate entire accuracy matrix for some pseudo labels N times, return means
 #def twochem_pseudo_mat(num_chems,N,num_msgs,num_traces,labels,feat_mat_norm):
