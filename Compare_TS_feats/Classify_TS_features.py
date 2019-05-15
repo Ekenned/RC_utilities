@@ -21,7 +21,7 @@ fname   = r'chem_ts_feat_low_conc_9f'
 
 # Optional user inputs:
 
-# n_feats = 10 # Set a number of features to include for further analysis
+num_feats = 10 # Set a number of features to include for further analysis
 # norm = 1 # Set to 1 to normalize all data by feature range to [0,1]
 # lim_feat= 1 # Sets a limit of 5000 features if set to 1
 # pl_num = 1 # increase this to plot more graphs, or 0 for no func plots
@@ -42,7 +42,7 @@ c_names,n_chems,n_traces,n_msgs,labels,feat_mat = get_arrays(c_dict,f_dict,l_dic
 # Generate 1-out 1 knn accuracy for every feature discriminating N chemicals
 accuracy_vec = chem_acc_vec(n_traces,feat_mat)
 
-thresh,c_inds = get_best_feats(accuracy_vec) # Find useful features (above threshold)
+thresh,c_inds = get_best_feats(accuracy_vec,num_feats) # Find useful features (above threshold)
 
 # Concatenate a subset array of useful features
 label_feat,concat_arr = concat_sub_feats(feat_mat,c_inds)
