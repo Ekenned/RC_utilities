@@ -100,9 +100,11 @@ def get_arrays(chem_names,feat_dict,label_dict,norm=0):
 def knn1d(num_obs,vals,labels):
     label_1nn = np.zeros(num_obs)
     for i in range(num_obs):
-        distances = np.abs(vals - vals[i])
+        distances = np.abs(vals - vals[i]) # distance vector from ith value
         distances[i] = np.max(distances) + 1 # rule out the value itself
+        # determine the label associated with the minimum distance value
         label_1nn[i] = labels[np.where(distances==np.min(distances))[0][0]]
+    # Find the fraction of instances where this label equals the true label
     sing_acc = np.sum(1*(labels==label_1nn))/num_obs
     return sing_acc    
 
@@ -146,6 +148,7 @@ def MDS_plot(feat_mat_norm,labels,c_inds):
         plt.scatter(arr_trans[inds,0],arr_trans[inds,1],marker=marker_list[c])
     plt.title('2-component reduction of discriminating features')
     plt.show()
+    return arr_trans
     
 # Generate a concatenated list of N-chemical ID labels for traces [0,0,0...N,N,N]
 def gen_chem_labels(num_traces):
@@ -153,6 +156,14 @@ def gen_chem_labels(num_traces):
     for c in range(len(num_traces)):
         chem_labels = np.append(chem_labels,c*(np.ones(int(num_traces[c]))))
     return chem_labels
+
+# Generate a dictionary of binary presence/absence for every chemical
+def gen_sing_chem_labels(num_traces):
+    chem_labels = gen_chem_labels(num_traces)
+    sing_chem_labels = {}
+    for c in range(len(num_traces)):  
+        sing_chem_labels[c] = 1*(chem_labels == c)  
+    return sing_chem_labels
 
 # Gather and append all trace labels for all chemicals into a 1D vector
 def gen_label_concat(labels):
@@ -176,7 +187,7 @@ def chem_acc_vec(num_traces,feat_mat_norm,plot_feat_num=0,lim_feat=0,feat_lim=50
     if randomize_labels == 1: # optionally randomize labels for negative control
         np.random.shuffle(chem_labels)
         
-    num_chems = len(num_traces) # len(feat_mat_norm.keys())
+    # num_chems = len(num_traces) # len(feat_mat_norm.keys())
     num_feats = np.shape(feat_mat_norm[0])[0] # just define this internally
     net_obs = int(sum(num_traces)) # total trace observations for all chems
     
@@ -205,6 +216,41 @@ def chem_acc_vec(num_traces,feat_mat_norm,plot_feat_num=0,lim_feat=0,feat_lim=50
         if np.remainder(f,100)==0: 
             print(f,'/',num_feats,', chem acc: ', accuracy_vec[f])
             
+    # Data cleaning
+    accuracy_vec = zero_nan_and_infs(accuracy_vec) # remove nans/infs            
+    return accuracy_vec
+
+# Generate an accuracy for individual chemicals by feature
+def sing_chem_acc_vec(num_traces,feat_mat_norm,lim_feat=0,feat_lim=5000):
+    
+    chem_labels = gen_sing_chem_labels(num_traces) # dict of single chem labels
+        
+    num_chems = len(num_traces) # len(feat_mat_norm.keys())
+    num_feats = np.shape(feat_mat_norm[0])[0] # just define this internally
+    net_obs = int(sum(num_traces)) # total trace observations for all chems
+    
+    if lim_feat == 1: # optionally limit to 5000 features for time saving, etc
+        if num_feats>feat_lim:
+            num_feats=feat_lim
+
+    accuracy_vec= np.zeros((num_feats,num_chems))
+    inds_discr  = np.zeros((num_feats,num_chems))
+    
+    for f in range(num_feats):
+        
+        # Append all features values for all chemicals   
+        vals_feat = append_chem_vals(feat_mat_norm,f)
+        
+        # perform knn calculation broken out for every chemical label-set
+        for c in range(num_chems):
+            accuracy_vec[f,c] = knn1d(net_obs,vals_feat,chem_labels[c])
+
+        if np.remainder(f,100)==0: 
+            print(f,'/',num_feats,', max feat acc: ', np.max(accuracy_vec[f,0:num_chems]))
+            
+    
+    for c in range(num_chems):
+        inds_discr[:,c] = get_high_value_inds(accuracy_vec[:,c],num_feats)
     # Data cleaning
     accuracy_vec = zero_nan_and_infs(accuracy_vec) # remove nans/infs            
     return accuracy_vec
@@ -397,7 +443,7 @@ def plot_all_feat_accs(accuracy_vec,line_dist):
     
     # Plot all the feature error rates on log scale
     plt.plot(1 - accuracy_vec,'o')
-    feat_plot_details(accuracy_vec,line_dist,ylims=[-.01,.1])
+    feat_plot_details(accuracy_vec,line_dist,ylims=[-.01,.3])
     plt.show()
         
 def feat_plot_details(accuracy_vec,line_dist,ylims):
