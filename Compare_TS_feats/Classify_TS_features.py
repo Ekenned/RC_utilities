@@ -23,7 +23,7 @@ fname   = r'chem_ts_feat'
 num_feats_ts = 7642
 num_feats = 10 # Set a number of features to include for further analysis
 # norm = 1 # Set to 1 to normalize all data by feature range to [0,1]
-# lim_feat= 1 # Sets a limit of 5000 features if set to 1
+lim_feat= 0 # Sets a limit of 5000 features if set to 1
 # pl_num = 1 # increase this to plot more graphs, or 0 for no func plots
 # num_reps = 100 # Number of validations for knn
 # train_frac = 0.5 # Fraction of traces to use for knn training/testing
@@ -40,38 +40,44 @@ n_feats,c_dict,f_dict,l_dict = load_TS_feat_mfile(wdir,fname)
 c_names,n_chems,n_traces,n_msgs,labels,feat_mat = get_arrays(c_dict,f_dict,l_dict)
 
 # Generate 1-out 1 knn accuracy by feature, discriminating all chemicals at once
-accuracy_vec = chem_acc_vec(n_traces,feat_mat)
+accuracy_vec = chem_acc_vec(n_traces,feat_mat,lim_feat=lim_feat)
+thresh,c_inds = get_best_feats(accuracy_vec,num_feats) # Find useful features
 
-# Generate 1-out 1 knn accuracy for every chemical for every feature
-sing_accuracy_vec = sing_chem_acc_vec(n_traces,feat_mat)
-
-thresh,c_inds = get_best_feats(accuracy_vec,num_feats) # Find useful features (above threshold)
-
-# Concatenate a subset array of useful features
+# Concatenate a subset array of useful features and plot MDS
 label_feat,concat_arr = concat_sub_feats(feat_mat,c_inds)
-
-# Concatenate a subset array of useful features
 arr_trans = MDS_plot(feat_mat,labels,c_inds)
-
-# Generate true accuracy for every feature and every pattern, n_traces may vary
-# accuracy_matrix = mult_acc_matrix(n_traces,labels,feat_mat)
 
 # Get multifeature knn and randomized label knn
 print('True labels: ')
 acc_tests = rep_knn_mult(concat_arr,label_feat)# n=1,num_reps=100,train_frac=0.5
 
-# Get multifeature knn by chemical
+# Generate true accuracy for every feature and every pattern, n_traces may vary
+# accuracy_matrix = mult_acc_matrix(n_traces,labels,feat_mat)
+
+# Generate 1-out 1 knn accuracy for every chemical for every feature
+sing_accuracy_vec = sing_chem_acc_vec(n_traces,feat_mat,lim_feat=lim_feat)
+
+# Perform multifeature knn by chemical
+# Functionalize this. Add in c_inds?
+################################################
 sing_chem_labels = gen_sing_chem_labels(n_traces)
-for c in range(n_chems):
-    
-    # Generate best indices, labels, and subset array for each chemical seperately
-    c_inds = inds_discr[0:num_feats,c].astype(int)
-    labels = sing_chem_labels[c]
-    alt_lbl,concat_arr = concat_sub_feats(feat_mat,c_inds)
-    
-    # Run the knn classifier
-    print('Chemical #',c,':')
-    acc_tests = rep_knn_mult(concat_arr,labels)
+
+binary_chem_acc = np.zeros((num_feats,n_chems))
+for f in range(1):
+    print(f)
+    f = f + 1
+    sing_c_inds = np.zeros((f,n_chems))
+    for c in range(n_chems):
+        
+        # Generate best indices, labels, and subset array for each chemical seperately
+        sing_c_inds[:,c] = inds_discr[0:f,c].astype(int)
+        sing_labels = sing_chem_labels[c]
+        alt_lbl,concat_arr = concat_sub_feats(feat_mat,sing_c_inds[:,c].astype(int))
+        
+        # Run the knn classifier
+        print('Chemical #',c,':')
+        acc_tests = rep_knn_mult(concat_arr,sing_labels)
+        binary_chem_acc[f-1,c] = 1 - np.median(acc_tests)
     
     # Plot the MDS embedding
     # embedding = MDS(n_components=2)
@@ -80,7 +86,8 @@ for c in range(n_chems):
     # plt.ylim((-500,500))
     # plt.xlim((-500,500))
     # plt.show()
-
+################################################
+    
 # develop a null set with random chemical labels
 print('Pseudo labels: ')
 pseudo_labels = np.random.randint(2,size=len(label_feat))
@@ -102,11 +109,11 @@ plot_feature(f,feat_mat,labels,n_chems)
 # np.sort(np.remainder(np.where(accuracy_vec>thresh)[0],9))
 
 # Plot the mean accuracy for only useful features
-plt.stem(1 - np.mean(accuracy_matrix[c_inds,:],0))
-plt.xlabel('Pattern ID')
-plt.ylabel('Error')
-plt.title('Average error rates by pattern, using features above threshold')
-plt.show()
+#plt.stem(1 - np.mean(accuracy_matrix[c_inds,:],0))
+#plt.xlabel('Pattern ID')
+#plt.ylabel('Error')
+#plt.title('Average error rates by pattern, using features above threshold')
+#plt.show()
     
 # Plot out all the accuracies by feature in linear and log scales:
 line_dist = num_feats_ts
@@ -134,7 +141,7 @@ plt.show()
 #plt.show()
    
 # Plot 2 features with color for label and marker for chemical
-fs = [0,1]
+fs = [0,2]
 lbl_concat = gen_label_concat(labels)
 markers = "so^x."
 for c in labels.keys():
@@ -145,6 +152,7 @@ for c in labels.keys():
 plt.legend(c_names)
 plt.xlabel('Feature #' + str(fs[0]))
 plt.ylabel('Feature #' + str(fs[1]))
+plt.xlim((-50,50))
                   
 #threshold = np.array([.9,.95,.98,.99,.995])
 #threshold = np.linspace(.7,1,1000)
