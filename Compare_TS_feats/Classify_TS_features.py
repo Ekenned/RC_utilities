@@ -16,16 +16,17 @@ from TS_sub_functions import *
 # ----------------------------------------------------------------------------
 # Required user inputs:
 
-wdir    = r"E:\TB_data\20190406_beer_classification"
+wdir    = r"D:\TB_data\20190406_beer_classification"
 fname   = r'chem_ts_feat'
 
 # Optional user inputs:
-num_feats_ts = 7642
-num_feats = 10 # Set a number of features to include for further analysis
+rec_f = 7642
+n_vars = 3 # Variables measured, e.g. if just V,P,T => 3, for V,dV,P,T => 4
+# num_feats = 10 # Set a number of features to include for further analysis
 # norm = 1 # Set to 1 to normalize all data by feature range to [0,1]
 lim_feat= 0 # Sets a limit of 5000 features if set to 1
-# pl_num = 1 # increase this to plot more graphs, or 0 for no func plots
-# num_reps = 100 # Number of validations for knn
+num_sens = 8 # Goes from 1 to 8, number of sensors on board
+# num_reps = 100 # Number of repeat validations for knn
 # train_frac = 0.5 # Fraction of traces to use for knn training/testing
 
 # ----------------------------------------------------------------------------
@@ -38,10 +39,17 @@ n_feats,c_dict,f_dict,l_dict = load_TS_feat_mfile(wdir,fname)
 
 # Gather data into matrices and optionally normalize feature array
 c_names,n_chems,n_traces,n_msgs,labels,feat_mat = get_arrays(c_dict,f_dict,l_dict)
+check_feat_freq(len(feat_mat[0]),rec_f) # error check the user rec_f input
 
 # Generate 1-out 1 knn accuracy by feature, discriminating all chemicals at once
 accuracy_vec = chem_acc_vec(n_traces,feat_mat,lim_feat=lim_feat)
-thresh,c_inds = get_best_feats(accuracy_vec,num_feats) # Find useful features
+
+# Find most useful features and most frequent feature functions
+thresh,c_inds = get_best_feats(accuracy_vec) # or add num_feats=10,20...
+most_freq_feats,n_repeats = get_recur_feat_inds(accuracy_vec.argsort()[::-1])
+
+# Turn the feature accuracy into a list of chunked accuracies by V,P,T...etc
+acc_chunks = chunk_vector(vec,rec_f)
 
 # Concatenate a subset array of useful features and plot MDS
 label_feat,concat_arr = concat_sub_feats(feat_mat,c_inds)
@@ -54,39 +62,10 @@ acc_tests = rep_knn_mult(concat_arr,label_feat)# n=1,num_reps=100,train_frac=0.5
 # Generate true accuracy for every feature and every pattern, n_traces may vary
 # accuracy_matrix = mult_acc_matrix(n_traces,labels,feat_mat)
 
-# Generate 1-out 1 knn accuracy for every chemical for every feature
-sing_accuracy_vec = sing_chem_acc_vec(n_traces,feat_mat,lim_feat=lim_feat)
-
 # Perform multifeature knn by chemical
-# Functionalize this. Add in c_inds?
-################################################
-sing_chem_labels = gen_sing_chem_labels(n_traces)
-
-binary_chem_acc = np.zeros((num_feats,n_chems))
-for f in range(1):
-    print(f)
-    f = f + 1
-    sing_c_inds = np.zeros((f,n_chems))
-    for c in range(n_chems):
-        
-        # Generate best indices, labels, and subset array for each chemical seperately
-        sing_c_inds[:,c] = inds_discr[0:f,c].astype(int)
-        sing_labels = sing_chem_labels[c]
-        alt_lbl,concat_arr = concat_sub_feats(feat_mat,sing_c_inds[:,c].astype(int))
-        
-        # Run the knn classifier
-        print('Chemical #',c,':')
-        acc_tests = rep_knn_mult(concat_arr,sing_labels)
-        binary_chem_acc[f-1,c] = 1 - np.median(acc_tests)
-    
-    # Plot the MDS embedding
-    # embedding = MDS(n_components=2)
-    # arr_trans = embedding.fit_transform(concat_arr)
-    # plt.scatter(arr_trans[:,0],arr_trans[:,1],c=labels,vmin=-.5,vmax=1.5)
-    # plt.ylim((-500,500))
-    # plt.xlim((-500,500))
-    # plt.show()
-################################################
+# sing_accuracy_vec = sing_chem_acc_vec(n_traces,feat_mat,lim_feat=lim_feat)
+# sing_chem_labels = gen_sing_chem_labels(n_traces)
+# binary_chem_acc = sing_chem_knn(sing_chem_labels,feat_mat,num_feats,n_chems)
     
 # develop a null set with random chemical labels
 print('Pseudo labels: ')
@@ -103,6 +82,22 @@ hist_acc(pseudo_acc_tests)
 hist_acc(acc_tests)
 plt.show()
 
+# Plot and recover the maximum feature accuracy for every variable for every sensor
+max_acc_VPT_HL = {}
+all_maxes = np.array([])
+for sens in range(1,num_sens + 1): # Goes from 1 to 8, not 0 to 7
+    max_acc_VPT_HL[sens] = plot_sensor_chunks(acc_chunks,n_vars,sens)
+    all_maxes  = np.append(all_maxes,max_acc_VPT_HL[sens])
+
+for var in range(n_vars):
+    plt.subplot(1,n_vars,var+1)
+    plt.title(var)
+    plt.stem(all_maxes[var::n_vars])
+    plt.ylim((0,1))
+    plt.xlim((-1,num_sens*2))
+    # plt.ylabel('Best feature performance')
+    plt.xlabel('Sensor HL #')
+    
 # plot the values for a feature 'f' for all chemicals by label
 f =  np.where(accuracy_vec==np.max(accuracy_vec))[0][0] # the best feature
 plot_feature(f,feat_mat,labels,n_chems)
@@ -116,17 +111,8 @@ plot_feature(f,feat_mat,labels,n_chems)
 #plt.show()
     
 # Plot out all the accuracies by feature in linear and log scales:
-line_dist = num_feats_ts
+line_dist = rec_f
 plot_all_feat_accs(accuracy_vec,line_dist)
-
-# Look for recurring features
-rec_f = num_feats_ts # number of features measured per variable
-recurring_feats = np.remainder(c_inds,rec_f)
-obs_reps = np.histogram(recurring_feats,bins=rec_f,range=(0,rec_f))
-plt.scatter(obs_reps[1][1::],obs_reps[0])
-plt.xlabel('Recurrent feature index')
-plt.ylabel('Feature observation count')
-plt.show()
 
 #repnum = 36 # Just a feature group size repeat one the figures over
 #max_val = np.zeros(repnum)

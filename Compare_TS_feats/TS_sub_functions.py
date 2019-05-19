@@ -15,6 +15,7 @@ from functools import reduce
 from sklearn.manifold import MDS
 from sklearn.neighbors import KNeighborsClassifier
 import random
+import time
 
 #import h5py
 #import pandas as pd
@@ -39,6 +40,14 @@ def get_high_value_inds(vector,num_inds):
         num_inds = len(vector)
     return vector.argsort()[::-1][0:num_inds]
 
+# Error check that a vector is an integer multiple of a number of features
+def check_feat_freq(vec_length,rec_f):
+    if np.round(vec_length/rec_f) != vec_length/rec_f:
+        print('rec_f number is wrong or feat mat is wrong size...')
+        time.sleep(1)
+        return
+
+# Load time series dictionaries from mat file
 def load_TS_feat_mfile(wdir,fname):
     
     # Load the data
@@ -52,6 +61,7 @@ def load_TS_feat_mfile(wdir,fname):
     
     return num_feats,chem_names,feat_dict,label_dict
 
+# Get basic properties and feature array out of dictionaries
 def get_arrays(chem_names,feat_dict,label_dict,norm=0):
     
     num_feats = np.shape(feat_dict[0][0][0])[0] # get the # features per trace
@@ -113,6 +123,18 @@ def sort_mat_err(mat):
     mean_errs = 1 - np.sort(np.mean(mat,1))[::-1]
     return mean_errs
 
+def sort_vec_err(vec):
+    errs = 1 - np.sort(vec)[::-1]
+    best_inds = accuracy_vec.argsort()[::-1]
+    return errs,best_inds
+
+# Chunk a vector into a list of blocks of length chunk_size
+def chunk_vector(vec,chunk_size):
+    check_feat_freq(len(vec),chunk_size) # check the chunk size divides to int
+    mat_dim = (np.int(len(vec)/chunk_size),chunk_size)# get output size
+    vec_blocks = np.reshape(vec,mat_dim) # create the output matrix
+    return vec_blocks
+
 # Concatenate all chemical data, reduce matrix to features 'c_inds' of interest
 def concat_sub_feats(feat_mat_norm,c_inds):
     
@@ -132,6 +154,29 @@ def concat_sub_feats(feat_mat_norm,c_inds):
     concat_arr = np.transpose(concat_arr)
             
     return label_feat,concat_arr
+
+# Look for recurring features, choose best 'num_check' subset for consideration
+def get_recur_feat_inds(inds,rec_f=7642,num_check=500):
+    
+    inds = inds[0:num_check]
+    plotting = 1
+    # Find recurring indices within the feature set
+    recurring_feats = np.remainder(inds,rec_f)
+    obs_reps = np.histogram(recurring_feats,bins=rec_f,range=(0,rec_f))
+    
+    # Refine to a list of only those features which repeat more than once
+    feat_repeat_inds = np.where(obs_reps[0]>1)[0]
+    repeat_count = obs_reps[0][feat_repeat_inds]
+    feats_sorted_by_freq = feat_repeat_inds[repeat_count.argsort()[::-1]]
+    sorted_repeat_count = repeat_count[repeat_count.argsort()[::-1]]
+    
+    if plotting == 1:
+        plt.stem(feats_sorted_by_freq,sorted_repeat_count)
+        plt.xlabel('Recurrent feature index')
+        plt.ylabel('Feature observation count')
+        plt.show()
+    
+    return feats_sorted_by_freq,sorted_repeat_count
 
 # Get reduced multidimensional representation of the data
 def MDS_plot(feat_mat_norm,labels,c_inds):
@@ -261,6 +306,29 @@ def get_best_feats(accuracy_vec,n_feats=10):
     thresh = np.sort(accuracy_vec)[::-1][n_feats]
     return thresh,np.where(accuracy_vec>=thresh)[0] # Find useful features (above threshold)
 
+# Run knn tests for binary single chemical accuracies
+def sing_chem_knn(sing_chem_labels,feat_mat,num_feats,n_chems):
+
+    # This will fill with test/train knn accuracy for every feature, every chem
+    binary_chem_acc = np.zeros((num_feats,n_chems))
+    for f in range(1):
+        print(f)
+        f = f + 1
+        sing_c_inds = np.zeros((f,n_chems))
+        for c in range(n_chems):
+            
+            # Generate best indices, labels, and subset array for each chemical seperately
+            sing_c_inds[:,c] = inds_discr[0:f,c].astype(int)
+            sing_labels = sing_chem_labels[c]
+            alt_lbl,concat_arr = concat_sub_feats(feat_mat,sing_c_inds[:,c].astype(int))
+            
+            # Run the knn classifier
+            print('Chemical #',c,':')
+            acc_tests = rep_knn_mult(concat_arr,sing_labels)
+            binary_chem_acc[f-1,c] = 1 - np.median(acc_tests)
+            
+    return binary_chem_acc
+
 # Repeat knn with different randomized training labels for validation   
 def knn_mult(train_frac,concat_arr,label_feat,n):
     
@@ -331,7 +399,7 @@ def load_settings():
     if a[1] == 'XPS15': # settings for graphs on 4K XPS15 screen only
         print('Using 4k figure settings...')
         mpl.rcParams["font.family"] = "Arial"
-        mpl.rcParams['figure.figsize']   = (20, 20)
+        mpl.rcParams['figure.figsize']   = (24, 20)
         mpl.rcParams['axes.titlesize']   = 30
         mpl.rcParams['axes.labelsize']   = 30
         mpl.rcParams['lines.linewidth']  = 2
@@ -418,6 +486,36 @@ def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num=0,lim_feat=0,f
 
 #################################################################################
 # Plotting functions
+
+def plot_sensor_chunks(acc_chunks,n_vars,sens,f_plt=500,HL=2):
+    best_acc_chunk = np.zeros((n_vars,2))
+    for L in range(HL):
+        plt.subplot(1,2,L+1)
+        if L == 0:
+            plt.title('High voltage')
+        else:
+            plt.title('Low voltage')
+        best_acc_chunk[:,L] = plot_sing_chunk(acc_chunks,n_vars,sens,L,f_plt,HL)
+    # plt.show() # comment this in to plot single sensors
+    return np.transpose(best_acc_chunk)
+
+    # Array like [V, P, T ; V, P, T], if P was bad then:
+    # array([[ 0.825     ,  0.54166667,  0.825     ],
+    #        [ 0.86666667,  0.58333333,  0.86666667]])
+    
+def plot_sing_chunk(acc_chunks,n_vars,sens,L,f_plt,HL):
+    colorlist = 'bgcrbm'
+    best_acc_chunk = np.zeros(n_vars)
+    for i in range(n_vars):
+        chunked_feats = np.sort(
+                acc_chunks[i + n_vars*L + HL*n_vars*(sens-1),:])[::-1][0:f_plt]
+        best_acc_chunk[i] = chunked_feats[0]
+        plt.plot(chunked_feats,colorlist[i]+'.')
+    plt.xlabel('Best feature #')
+    plt.ylabel('Classification accuracy')
+    plt.ylim((0.2,1))
+    plt.xlim((0,f_plt)) 
+    return best_acc_chunk
     
 def plot_feature(f,feat_mat,labels,n_chems):
     for c in range(n_chems):        

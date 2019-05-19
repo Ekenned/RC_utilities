@@ -46,7 +46,7 @@ for sens = 1:num_sensors
         locl_vec_P  = smooth(locl_vec_P,smoothing);
         locl_vec_P = locl_vec_P(1:sparsity:end);
         locl_vec_T = squeeze(T(sens,trace_num,:) )-movmean(squeeze(T(sens,trace_num,:) ),SR*30);
-        locl_vec_T  = smooth(locl_vec_VOC,smoothing);
+        locl_vec_T  = smooth(locl_vec_T,smoothing);
         locl_vec_T = locl_vec_T(1:sparsity:end);
         
         % Perform feature extraction on V,P,T sepeartely
