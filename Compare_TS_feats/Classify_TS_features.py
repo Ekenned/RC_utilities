@@ -49,7 +49,7 @@ thresh,c_inds = get_best_feats(accuracy_vec) # or add num_feats=10,20...
 most_freq_feats,n_repeats = get_recur_feat_inds(accuracy_vec.argsort()[::-1])
 
 # Turn the feature accuracy into a list of chunked accuracies by V,P,T...etc
-acc_chunks = chunk_vector(vec,rec_f)
+acc_chunks = chunk_vector(accuracy_vec,rec_f)
 
 # Concatenate a subset array of useful features and plot MDS
 label_feat,concat_arr = concat_sub_feats(feat_mat,c_inds)
@@ -88,19 +88,31 @@ all_maxes = np.array([])
 for sens in range(1,num_sens + 1): # Goes from 1 to 8, not 0 to 7
     max_acc_VPT_HL[sens] = plot_sensor_chunks(acc_chunks,n_vars,sens)
     all_maxes  = np.append(all_maxes,max_acc_VPT_HL[sens])
+plt.show() # indent this to show individual sensor profiles
 
+# Break out feature accuracies by High/Low
+HL = 2
+for i in range(HL):
+    plt.subplot(1,HL,i+1)
+    plt.title('H/L comparison')
+    plt.boxplot(np.sort(all_maxes[i::HL])[::-1])
+    plt.ylim((0,1))
+plt.show()
+
+# Break out the feature accuracies by variable
 for var in range(n_vars):
     plt.subplot(1,n_vars,var+1)
     plt.title(var)
     plt.stem(all_maxes[var::n_vars])
     plt.ylim((0,1))
-    plt.xlim((-1,num_sens*2))
+    plt.xlim((-1,num_sens*HL))
     # plt.ylabel('Best feature performance')
     plt.xlabel('Sensor HL #')
+plt.show()
     
 # plot the values for a feature 'f' for all chemicals by label
-f =  np.where(accuracy_vec==np.max(accuracy_vec))[0][0] # the best feature
-plot_feature(f,feat_mat,labels,n_chems)
+# f =  np.where(accuracy_vec==np.max(accuracy_vec))[0][0] # the best feature
+# plot_feature(f,feat_mat,labels,n_chems)
 # np.sort(np.remainder(np.where(accuracy_vec>thresh)[0],9))
 
 # Plot the mean accuracy for only useful features
@@ -111,8 +123,8 @@ plot_feature(f,feat_mat,labels,n_chems)
 #plt.show()
     
 # Plot out all the accuracies by feature in linear and log scales:
-line_dist = rec_f
-plot_all_feat_accs(accuracy_vec,line_dist)
+# line_dist = rec_f
+# plot_all_feat_accs(accuracy_vec,line_dist)
 
 #repnum = 36 # Just a feature group size repeat one the figures over
 #max_val = np.zeros(repnum)
@@ -127,7 +139,7 @@ plot_all_feat_accs(accuracy_vec,line_dist)
 #plt.show()
    
 # Plot 2 features with color for label and marker for chemical
-fs = [0,2]
+fs = [11,15]
 lbl_concat = gen_label_concat(labels)
 markers = "so^x."
 for c in labels.keys():
@@ -138,7 +150,7 @@ for c in labels.keys():
 plt.legend(c_names)
 plt.xlabel('Feature #' + str(fs[0]))
 plt.ylabel('Feature #' + str(fs[1]))
-plt.xlim((-50,50))
+# plt.xlim((-50,50))
                   
 #threshold = np.array([.9,.95,.98,.99,.995])
 #threshold = np.linspace(.7,1,1000)

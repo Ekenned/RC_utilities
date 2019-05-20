@@ -504,13 +504,13 @@ def plot_sensor_chunks(acc_chunks,n_vars,sens,f_plt=500,HL=2):
     #        [ 0.86666667,  0.58333333,  0.86666667]])
     
 def plot_sing_chunk(acc_chunks,n_vars,sens,L,f_plt,HL):
-    colorlist = 'bgcrbm'
+    colorlist = 'kgcrbm'
     best_acc_chunk = np.zeros(n_vars)
     for i in range(n_vars):
         chunked_feats = np.sort(
                 acc_chunks[i + n_vars*L + HL*n_vars*(sens-1),:])[::-1][0:f_plt]
-        best_acc_chunk[i] = chunked_feats[0]
-        plt.plot(chunked_feats,colorlist[i]+'.')
+        best_acc_chunk[i] = np.mean(chunked_feats[0:5]) # hacky but works well
+        plt.plot(chunked_feats,colorlist[i])
     plt.xlabel('Best feature #')
     plt.ylabel('Classification accuracy')
     plt.ylim((0.2,1))
