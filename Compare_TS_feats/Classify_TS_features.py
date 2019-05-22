@@ -16,12 +16,13 @@ from TS_sub_functions import *
 # ----------------------------------------------------------------------------
 # Required user inputs:
 
-wdir    = r"D:\TB_data\20190406_beer_classification"
+wdir    = r"E:\TB_data\20190517_beer_classification"
 fname   = r'chem_ts_feat'
 
 # Optional user inputs:
-rec_f = 7642
-n_vars = 3 # Variables measured, e.g. if just V,P,T => 3, for V,dV,P,T => 4
+rec_f = 219
+num_feats = 20
+n_vars = 6 # Variables measured, e.g. if just V,P,T => 3, for V,dV,P,T => 4
 # num_feats = 10 # Set a number of features to include for further analysis
 # norm = 1 # Set to 1 to normalize all data by feature range to [0,1]
 lim_feat= 0 # Sets a limit of 5000 features if set to 1
@@ -46,7 +47,10 @@ accuracy_vec = chem_acc_vec(n_traces,feat_mat,lim_feat=lim_feat)
 
 # Find most useful features and most frequent feature functions
 thresh,c_inds = get_best_feats(accuracy_vec) # or add num_feats=10,20...
-most_freq_feats,n_repeats = get_recur_feat_inds(accuracy_vec.argsort()[::-1])
+most_freq_feats,n_repeats = get_recur_feat_inds(accuracy_vec.argsort()[::-1],rec_f = rec_f)
+n_print_feats = 5
+print('The top',n_print_feats,'most frequent feature #s are:')
+print(most_freq_feats[0:n_print_feats])
 
 # Turn the feature accuracy into a list of chunked accuracies by V,P,T...etc
 acc_chunks = chunk_vector(accuracy_vec,rec_f)
@@ -83,33 +87,23 @@ hist_acc(acc_tests)
 plt.show()
 
 # Plot and recover the maximum feature accuracy for every variable for every sensor
-max_acc_VPT_HL = {}
-all_maxes = np.array([])
-for sens in range(1,num_sens + 1): # Goes from 1 to 8, not 0 to 7
-    max_acc_VPT_HL[sens] = plot_sensor_chunks(acc_chunks,n_vars,sens)
-    all_maxes  = np.append(all_maxes,max_acc_VPT_HL[sens])
-plt.show() # indent this to show individual sensor profiles
-
-# Break out feature accuracies by High/Low
-HL = 2
-for i in range(HL):
-    plt.subplot(1,HL,i+1)
-    plt.title('H/L comparison')
-    plt.boxplot(np.sort(all_maxes[i::HL])[::-1])
+acc_var = {}  
+high_v_accs = np.array([])
+low_v_accs = np.array([])
+for var in range(n_vars):    
+    acc_var[var] = plot_var_acc(acc_chunks,n_vars=n_vars,var=var,num_sens=num_sens)
     plt.ylim((0,1))
-plt.show()
+    plt.show()
+    high_v_accs = np.append(high_v_accs,acc_var[var][:,0])
+    low_v_accs = np.append(low_v_accs,acc_var[var][:,1])
 
+plt.scatter(np.array(range(num_sens*n_vars)).astype(float)/num_sens,high_v_accs)
+plt.scatter(np.array(range(num_sens*n_vars)).astype(float)/num_sens,low_v_accs)
+plt.xlabel('Variable #')
+plt.ylabel('Accuracy, blue for high')
+plt.show()
 # Break out the feature accuracies by variable
-for var in range(n_vars):
-    plt.subplot(1,n_vars,var+1)
-    plt.title(var)
-    plt.stem(all_maxes[var::n_vars])
-    plt.ylim((0,1))
-    plt.xlim((-1,num_sens*HL))
-    # plt.ylabel('Best feature performance')
-    plt.xlabel('Sensor HL #')
-plt.show()
-    
+
 # plot the values for a feature 'f' for all chemicals by label
 # f =  np.where(accuracy_vec==np.max(accuracy_vec))[0][0] # the best feature
 # plot_feature(f,feat_mat,labels,n_chems)
@@ -139,17 +133,17 @@ plt.show()
 #plt.show()
    
 # Plot 2 features with color for label and marker for chemical
-fs = [11,15]
+fs = [0,1]
 lbl_concat = gen_label_concat(labels)
-markers = "so^x."
+markers = "os^."
 for c in labels.keys():
     inds = np.where(label_feat==c)[0]
     m = markers[c]
     # plt.scatter(concat_arr[inds,fs[0]],concat_arr[inds,fs[1]],c=lbl_concat[0:int(n_traces[c])],marker = m)
     plt.scatter(concat_arr[inds,fs[0]],concat_arr[inds,fs[1]],marker = m)
 plt.legend(c_names)
-plt.xlabel('Feature #' + str(fs[0]))
-plt.ylabel('Feature #' + str(fs[1]))
+plt.xlabel('Single best feature #' + str(c_inds[fs[0]]))
+plt.ylabel('Single best feature #' + str(c_inds[fs[1]]))
 # plt.xlim((-50,50))
                   
 #threshold = np.array([.9,.95,.98,.99,.995])

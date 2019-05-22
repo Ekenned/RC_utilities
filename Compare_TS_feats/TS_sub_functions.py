@@ -488,7 +488,7 @@ def mult_acc_matrix(num_traces,labels,feat_mat_norm,plot_feat_num=0,lim_feat=0,f
 # Plotting functions
 
 def plot_sensor_chunks(acc_chunks,n_vars,sens,f_plt=500,HL=2):
-    best_acc_chunk = np.zeros((n_vars,2))
+    best_acc_chunk = np.zeros((n_vars,HL))
     for L in range(HL):
         plt.subplot(1,2,L+1)
         if L == 0:
@@ -502,6 +502,25 @@ def plot_sensor_chunks(acc_chunks,n_vars,sens,f_plt=500,HL=2):
     # Array like [V, P, T ; V, P, T], if P was bad then:
     # array([[ 0.825     ,  0.54166667,  0.825     ],
     #        [ 0.86666667,  0.58333333,  0.86666667]])
+
+def plot_var_acc(acc_chunks,n_vars=3,num_sens=8,var=0,HL=2,num_mean_feat = 5,plotting=1,rec_f = 219): 
+
+    acc_mean = np.zeros((num_sens,HL))
+    chunked_acc = np.array([])
+    for sens in range(num_sens): # for every sensor
+        for L in range(HL): # for high and low
+            select_indices = var + n_vars*L + HL*n_vars*(sens)
+            loc_chunk = acc_chunks[select_indices,:]
+            chunked_acc = np.concatenate((chunked_acc,loc_chunk),0)
+            acc_mean[sens,L] = np.mean(np.sort(loc_chunk)[::-1][0:num_mean_feat])
+    if plotting == 1:          
+        plt.plot(chunked_acc,'k.')
+        for i in range(num_sens*HL):
+            plt.plot([rec_f *i,rec_f *i],[0,1],'c--')
+            plt.xlabel('Features for variable #' + str(var))
+            plt.ylabel('Classification accuracy')
+    
+    return acc_mean
     
 def plot_sing_chunk(acc_chunks,n_vars,sens,L,f_plt,HL):
     colorlist = 'kgcrbm'
