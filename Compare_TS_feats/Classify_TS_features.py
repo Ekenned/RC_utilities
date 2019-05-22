@@ -21,7 +21,7 @@ fname   = r'chem_ts_feat'
 
 # Optional user inputs:
 rec_f = 219
-num_feats = 20
+num_feats = 10
 n_vars = 6 # Variables measured, e.g. if just V,P,T => 3, for V,dV,P,T => 4
 # num_feats = 10 # Set a number of features to include for further analysis
 # norm = 1 # Set to 1 to normalize all data by feature range to [0,1]
@@ -46,7 +46,7 @@ check_feat_freq(len(feat_mat[0]),rec_f) # error check the user rec_f input
 accuracy_vec = chem_acc_vec(n_traces,feat_mat,lim_feat=lim_feat)
 
 # Find most useful features and most frequent feature functions
-thresh,c_inds = get_best_feats(accuracy_vec) # or add num_feats=10,20...
+thresh,c_inds = get_best_feats(accuracy_vec) # or add n_feats=10,20...
 most_freq_feats,n_repeats = get_recur_feat_inds(accuracy_vec.argsort()[::-1],rec_f = rec_f)
 n_print_feats = 5
 print('The top',n_print_feats,'most frequent feature #s are:')
