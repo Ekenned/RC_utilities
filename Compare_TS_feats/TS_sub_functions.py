@@ -354,22 +354,32 @@ def rep_knn_mult(concat_arr,label_feat,n=1,num_reps=100,train_frac=0.5):
     print('Classification error: ',1 - np.median(acc_tests))
     # print(' \n ')
     return acc_tests
-        
-# Generate entire accuracy matrix for some pseudo labels, repeat N times, return means
-def gen_pseudo_mat(num_chems,num_msgs,num_traces,N,labels,feat_mat_norm,lim_feat=0):
 
-    pseudo_acc_means = {}
-    for k in range(N):
-        print('Developing pseudo-accuracies for label set #',k,'/',N-1)
-        
-        # Perform a pseudo random label bootstrap, first develop the random labels
-        pseudo_labels = {}
-        for i in range(num_chems):
-            pseudo_labels[i] = 1 + np.random.choice(int(num_msgs),int(num_traces[i]))
-        
-        # Applt the pseudo labels to develop an accuracy matrix, and mean vector
-        pseudo_acc_mat = mult_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0,lim_feat)
-        pseudo_acc_means[k] = sort_mat_err(pseudo_acc_mat)
+# split indices randomly into test and train groups
+def test_train_inds(n_obs,train_split):
+    
+    n_train       = round(train_split*n_obs)
+    n_test        = n_obs - n_train   
+    train_inds   = (np.random.choice(n_obs, n_train, replace=False)).astype(int)
+    test_inds    = (np.setdiff1d(range(n_obs),train_inds)).astype(int)
+
+    return train_inds,test_inds
+   
+# Generate entire accuracy matrix for some pseudo labels, repeat N times, return means
+#def gen_pseudo_mat(num_chems,num_msgs,num_traces,N,labels,feat_mat_norm,lim_feat=0):
+#
+#    pseudo_acc_means = {}
+#    for k in range(N):
+#        print('Developing pseudo-accuracies for label set #',k,'/',N-1)
+#        
+#        # Perform a pseudo random label bootstrap, first develop the random labels
+#        pseudo_labels = {}
+#        for i in range(num_chems):
+#            pseudo_labels[i] = 1 + np.random.choice(int(num_msgs),int(num_traces[i]))
+#        
+#        # Applt the pseudo labels to develop an accuracy matrix, and mean vector
+#        pseudo_acc_mat = mult_acc_matrix(num_traces,pseudo_labels,feat_mat_norm,0,lim_feat)
+#        pseudo_acc_means[k] = sort_mat_err(pseudo_acc_mat)
         
     return pseudo_acc_means
 

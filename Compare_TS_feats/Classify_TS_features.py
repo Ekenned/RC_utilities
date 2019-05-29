@@ -16,13 +16,13 @@ from TS_sub_functions import *
 # ----------------------------------------------------------------------------
 # Required user inputs:
 
-wdir    = r"E:\TB_data\20190517_beer_classification"
+wdir    = r"E:\TB_data\20190517_beer_classification\7642_feat_set"
 fname   = r'chem_ts_feat'
 
 # Optional user inputs:
-rec_f = 219
+rec_f = 7642
 num_feats = 10
-n_vars = 6 # Variables measured, e.g. if just V,P,T => 3, for V,dV,P,T => 4
+n_vars = 1 # Variables measured, e.g. if just V,P,T => 3, for V,dV,P,T => 4
 # num_feats = 10 # Set a number of features to include for further analysis
 # norm = 1 # Set to 1 to normalize all data by feature range to [0,1]
 lim_feat= 0 # Sets a limit of 5000 features if set to 1
